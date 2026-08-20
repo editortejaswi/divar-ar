@@ -1,40 +1,68 @@
+import * as THREE from 'three';
 import { App } from 'locar';
 import { POIS, FESTIVAL, DEMO_ORIGIN } from './pois.js';
 import { makeLabelSprite, KIND } from './labels.js';
 import { haversine, bearing, compass16, fmtDist } from './geo.js';
 
+const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
-const DEMO = new URLSearchParams(location.search).has('demo');
+const DEMO = params.has('demo');
+const DEBUG = params.has('debug');
 
 // ---- state ----
 let app, locar;
-let coords = null;          // { latitude, longitude, accuracy }
+let coords = null;
 let firstFix = true;
 let started = false;
-const markers = [];         // { poi, sprite, dist }
-const captures = [];        // { lat, lon, acc }
-let openId = null;          // POI id currently shown in the sheet
+const markers = [];
+const captures = [];
+let openId = null;
 const POI_BY_ID = Object.fromEntries(POIS.map((p) => [p.id, p]));
-
-// walking ETA in minutes at ~4.8 km/h (80 m/min), straight-line.
 const walkEta = (m) => Math.max(1, Math.round(m / 80));
 
-// ---- build the AR app ----
-function build() {
-  app = new App({
-    cameraOptions: { hFov: 80, near: 0.1, far: 8000 },
-    canvas: $('glscene'),
-    deviceOrientationOptions: { enabled: !DEMO },
-    gpsOptions: { gpsMinAccuracy: DEMO ? 1e6 : 100 },
-  });
+// ---- guidance state ----
+let arrow = null;
+let guideId = null;
+let rafId = null;
 
-  app.on('objectsIntersected', (e) => {
-    const hit = e.intersections.find((i) => i.object?.properties?.poi);
-    if (hit) showDetail(hit.object.properties.poi);
-  });
+// ---- debug diagnostics (?debug=1) ------------------------------------------
+const dbgLog = [];
+function dlog(msg) {
+  if (!DEBUG) return;
+  dbgLog.push(msg);
+  if (dbgLog.length > 6) dbgLog.shift();
+  refreshDbg();
+}
+function refreshDbg() {
+  if (!DEBUG) return;
+  let el = $('dbg');
+  if (!el) {
+    el = document.createElement('pre');
+    el.id = 'dbg';
+    el.style.cssText = `position:fixed;left:6px;top:calc(var(--safe-t) + 108px);z-index:60;max-width:94vw;
+      margin:0;padding:8px 10px;background:rgba(0,0,0,0.74);color:#7fffd4;font:11px/1.45 ui-monospace,monospace;
+      border-radius:8px;white-space:pre-wrap;pointer-events:none`;
+    document.body.appendChild(el);
+  }
+  const v = document.querySelector('video');
+  const s = v && v.srcObject;
+  const tr = s && s.getVideoTracks && s.getVideoTracks()[0];
+  const set = tr && tr.getSettings ? tr.getSettings() : {};
+  const line = [
+    `secure=${window.isSecureContext} dpr=${devicePixelRatio}`,
+    v ? `video ${v.videoWidth}x${v.videoHeight} rs=${v.readyState} paused=${v.paused}` : 'NO <video> element',
+    `srcObject=${s ? 'yes' : 'no'} track=${tr ? (tr.readyState + '/' + (tr.enabled ? 'en' : 'dis')) : 'none'}`,
+    set.width ? `stream ${set.width}x${set.height} facing=${set.facingMode || '?'}` : '',
+    `canvasBG=${getComputedStyle($('glscene')).backgroundColor}`,
+  ].filter(Boolean).join('\n');
+  el.textContent = 'DEBUG\n' + line + (dbgLog.length ? '\n' + dbgLog.join('\n') : '');
+}
+if (DEBUG) {
+  window.addEventListener('error', (e) => dlog('JSERR ' + (e.message || e.error)));
+  window.addEventListener('unhandledrejection', (e) => dlog('REJECT ' + (e.reason?.message || e.reason)));
 }
 
-// ---- start (must be called from a user gesture for iOS permissions) ----
+// ---- start (construct App INSIDE the tap gesture so iOS plays the camera) ---
 async function start() {
   if (started) return;
   started = true;
@@ -43,16 +71,39 @@ async function start() {
   $('smart').style.display = 'block';
   $('toolbar').style.display = 'flex';
 
+  app = new App({
+    cameraOptions: { hFov: 80, near: 0.1, far: 8000 },
+    canvas: $('glscene'),
+    deviceOrientationOptions: { enabled: !DEMO },
+    gpsOptions: { gpsMinAccuracy: DEMO ? 1e6 : 100 },
+  });
+  app.on('objectsIntersected', (e) => {
+    const hit = e.intersections.find((i) => i.object?.properties?.poi);
+    if (hit) showDetail(hit.object.properties.poi);
+  });
   locar = app.locar;
+
+  if (DEBUG) {
+    app.webcam.on('webcamstarted', (ev) => dlog(`webcamstarted ${ev.videoWidth}x${ev.videoHeight}`));
+    app.webcam.on('webcamerror', (ev) => dlog(`WEBCAM ERR ${ev.code}: ${ev.message}`));
+    refreshDbg();
+    setInterval(refreshDbg, 1000);
+  }
+
   try {
     await app.start();
+    dlog('app.start resolved');
   } catch (err) {
+    dlog(`app.start REJECT ${err.code}: ${err.message}`);
     console.warn('AR sensors unavailable:', err);
     banner('Camera or motion unavailable \u2014 use \u2630 Sites for a list & directions.');
   }
 
-  locar.on('gpserror', (err) => banner(`GPS error (${err.code}). Move outdoors for a clear sky view.`));
+  // Belt-and-braces for iOS Safari: inline + muted + play within this gesture.
+  const v = document.querySelector('video');
+  if (v) { v.muted = true; v.setAttribute('playsinline', ''); v.play().then(() => dlog('video.play() ok')).catch((e) => dlog('video.play() fail ' + e.name)); }
 
+  locar.on('gpserror', (err) => banner(`GPS error (${err.code}). Move outdoors for a clear sky view.`));
   locar.on('gpsupdate', (ev) => {
     coords = ev.position.coords;
     if (firstFix) { addPois(); firstFix = false; }
@@ -60,111 +111,117 @@ async function start() {
   });
 
   updateSmart();
-  setInterval(updateSmart, 1000); // keep the countdown ticking
+  setInterval(updateSmart, 1000);
 
   if (DEMO) locar.fakeGps(DEMO_ORIGIN.lon, DEMO_ORIGIN.lat);
   else locar.startGps();
 }
 
-// ---- place every POI as a floating label (only valid after first fix) ----
+// ---- place POI labels (valid only after first fix) ----
 function addPois() {
   for (const poi of POIS) {
     const sprite = makeLabelSprite(poi);
     locar.add(sprite, poi.lon, poi.lat, poi.elev ?? 3, { poi });
     markers.push({ poi, sprite });
   }
+  dlog(`added ${markers.length} POIs`);
 }
 
-// ---- per-fix update: constant-apparent-size labels + HUD ----
+// ---- per-fix update ----
 function refresh() {
   if (!coords) return;
-  let nearest = null;
-  let nearestD = Infinity;
-
+  let nearest = null, nearestD = Infinity;
   for (const m of markers) {
     const d = haversine(coords.latitude, coords.longitude, m.poi.lat, m.poi.lon);
     m.dist = d;
     const h = Math.min(Math.max(d * 0.1, 5), 120);
     m.sprite.scale.set(h * (m.sprite.aspect || 2), h, 1);
     m.sprite.visible = d < 4000;
-    // The nearest label for the HUD prefers something to *explore* (heritage).
     if (m.poi.layer !== 'festival' && d < nearestD) { nearestD = d; nearest = m; }
   }
-
   if (nearest) {
     const b = bearing(coords.latitude, coords.longitude, nearest.poi.lat, nearest.poi.lon);
     const ic = (KIND[nearest.poi.kind] || KIND.church).icon;
-    $('hud-near').textContent =
-      `${ic} ${nearest.poi.name} \u00B7 ${fmtDist(nearestD)} \u00B7 ~${walkEta(nearestD)} min ${compass16(b)}`;
+    $('hud-near').textContent = `${ic} ${nearest.poi.name} \u00B7 ${fmtDist(nearestD)} \u00B7 ~${walkEta(nearestD)} min ${compass16(b)}`;
   }
   const acc = Math.round(coords.accuracy);
   $('hud-dot').className = 'dot' + (acc <= 30 ? ' ok' : '');
   $('hud-acc').textContent = `\u00B1${acc} m`;
 
   if (openId) renderDetail(POI_BY_ID[openId]);
+  if (guideId) {
+    updateGuideBar();
+    const g = POI_BY_ID[guideId];
+    const gd = haversine(coords.latitude, coords.longitude, g.lat, g.lon);
+    if (gd < 20) { banner(`You\u2019ve reached ${g.name}. \u{1F389}`); stopGuide(); }
+  }
   updateSmart();
 }
 
-// ---- adaptive Bonderam banner: countdown + distance + ETA to main event ----
-function distToEvent() {
-  if (!coords) return null;
-  const { lat, lon } = FESTIVAL.mainEvent;
-  const d = haversine(coords.latitude, coords.longitude, lat, lon);
-  return { d, eta: walkEta(d), brg: bearing(coords.latitude, coords.longitude, lat, lon) };
+// ---- 3D arrow wayfinding ----------------------------------------------------
+function ensureArrow() {
+  if (arrow) return arrow;
+  const mat = new THREE.MeshBasicMaterial({ color: 0x2fd47a, depthTest: false });
+  arrow = new THREE.Group();
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 1.7), mat);
+  shaft.position.z = 0.75;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.95, 1.5, 4), mat);
+  head.rotation.x = -Math.PI / 2;                   // apex -> -Z (forward)
+  head.position.z = -0.75;
+  arrow.add(shaft, head);
+  arrow.scale.setScalar(0.5);
+  arrow.renderOrder = 20;
+  arrow.visible = false;
+  app.scene.add(arrow);
+  return arrow;
 }
 
-function fmtCountdown(ms) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-  return h >= 1
-    ? `${h}h ${String(m).padStart(2, '0')}m`
-    : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+function startGuide(poi) {
+  ensureArrow();
+  guideId = poi.id;
+  closeSheet();
+  $('guide').style.display = 'flex';
+  updateGuideBar();
+  banner(`Follow the arrow to ${poi.name}.`);
+  if (!rafId) tickGuide();
 }
 
-const fmtClock = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+function stopGuide() {
+  guideId = null;
+  if (arrow) arrow.visible = false;
+  $('guide').style.display = 'none';
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+}
 
-function nearestExploreHint() {
-  if (!coords || !markers.length) return '';
-  let best = null, bestD = Infinity;
-  for (const m of markers) {
-    if (m.poi.layer === 'festival') continue;
-    const d = m.dist ?? haversine(coords.latitude, coords.longitude, m.poi.lat, m.poi.lon);
-    if (d < bestD) { bestD = d; best = m; }
+function tickGuide() {
+  rafId = requestAnimationFrame(tickGuide);
+  if (!guideId || !arrow || !app) return;
+  const m = markers.find((x) => x.poi.id === guideId);
+  if (!m) { arrow.visible = false; return; }
+  const cam = app.camera;
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+  fwd.y = 0;
+  if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1);
+  fwd.normalize();
+  const bob = Math.sin(performance.now() / 300) * 0.08;
+  arrow.position.copy(cam.position).addScaledVector(fwd, 5);
+  arrow.position.y = cam.position.y - 1.0 + bob;
+  const tgt = m.sprite.position.clone();
+  tgt.y = arrow.position.y;
+  arrow.lookAt(tgt);
+  arrow.visible = true;
+}
+
+function updateGuideBar() {
+  const poi = POI_BY_ID[guideId];
+  if (!poi) return;
+  let txt = poi.name;
+  if (coords) {
+    const d = haversine(coords.latitude, coords.longitude, poi.lat, poi.lon);
+    const b = bearing(coords.latitude, coords.longitude, poi.lat, poi.lon);
+    txt = `${poi.name} \u00B7 ${fmtDist(d)} \u00B7 ~${walkEta(d)} min ${compass16(b)}`;
   }
-  return best ? `nearest: ${best.poi.name} \u00B7 ${fmtDist(bestD)} (~${walkEta(bestD)} min)` : '';
-}
-
-function updateSmart() {
-  const el = $('smart');
-  if (!el || el.style.display === 'none') return;
-  const now = Date.now();
-  const start = Date.parse(FESTIVAL.startsAt);
-  const end = Date.parse(FESTIVAL.endsAt);
-  const de = distToEvent();
-  const where = de ? `${fmtDist(de.d)} ${compass16(de.brg)} \u00B7 ~${de.eta} min walk` : '';
-
-  let phase, html;
-  if (now >= end) {
-    phase = 'after';
-    const hint = nearestExploreHint();
-    html = `<b>Explore Divar</b>${hint ? ' \u00B7 ' + hint : ' \u00B7 tap for sites'}`;
-  } else if (now >= start) {
-    phase = 'live';
-    const floaty = now < Date.parse(FESTIVAL.floatAt) ? 'float parade at 4 PM' : 'float parade underway';
-    html = `<b>\u{1F389} Bonderam is LIVE</b> \u00B7 ${de ? 'main event ' + where : floaty}`;
-  } else {
-    const ms = start - now;
-    if (ms <= 6 * 3600 * 1000 && de) {
-      phase = 'soon';
-      const leaveBy = new Date(start - de.eta * 60 * 1000);
-      html = `<b>\u23F3 Starts in ${fmtCountdown(ms)}</b> \u00B7 you\u2019re ${where} \u00B7 leave by ${fmtClock(leaveBy)}`;
-    } else {
-      phase = 'before';
-      html = `<b>\u{1F6A9} Bonderam in ${fmtCountdown(ms)}</b> \u00B7 ${de ? 'main event ' + where : 'Sat 22 Aug, 3 PM'}`;
-    }
-  }
-  el.dataset.phase = phase;
-  el.innerHTML = html;
+  $('guide-txt').textContent = '\u2794 ' + txt;
 }
 
 // ---- bottom sheet ----
@@ -182,15 +239,13 @@ function renderDetail(poi) {
     dirChip = `<span class="chip strong">${fmtDist(d)} ${compass16(b)} \u00B7 ~${walkEta(d)} min</span>`;
   }
   const approx = poi.verified ? '' : `<span class="chip">\u25B3 approx location</span>`;
-  const hint = poi.verified ? '' :
-    `<p class="desc" style="color:var(--muted);font-size:13px">Approximate coordinate.
-      Stand at the spot and tap <b>&#128205; Capture</b> to record the exact position.</p>`;
   $('sheet-body').innerHTML = `
     <h2>${meta.icon} ${poi.name}</h2>
     <p class="alt">${poi.alt}</p>
     <div class="meta"><span class="chip">${poi.year}</span>${dirChip}${approx}</div>
     <p class="desc">${poi.blurb}</p>
-    ${hint}`;
+    <button class="btn go wide" id="detail-guide">\u2794 Guide me there</button>`;
+  $('detail-guide').addEventListener('click', () => startGuide(poi));
 }
 
 function renderSites() {
@@ -206,16 +261,18 @@ function renderSites() {
       const b = bearing(coords.latitude, coords.longitude, r.poi.lat, r.poi.lon);
       dist = `<div class="dist"><div class="d">${fmtDist(r.dist)}</div><div class="b">~${walkEta(r.dist)} min ${compass16(b)}</div></div>`;
     }
-    return `<div class="site" data-id="${r.poi.id}">
+    return `<div class="site">
       <div class="ic">${meta.icon}</div>
-      <div><div class="name">${r.poi.name}</div><div class="where">${r.poi.alt}</div></div>
+      <div class="main" data-open="${r.poi.id}"><div class="name">${r.poi.name}</div><div class="where">${r.poi.alt}</div></div>
       ${dist}
+      <button class="row-guide" data-guide="${r.poi.id}" title="Guide me">\u2794</button>
     </div>`;
   }).join('');
   openSheet(`<h2>Explore &amp; navigate</h2><div>${html}</div>`);
-  $('sheet-body').querySelectorAll('.site').forEach((el) => {
-    el.addEventListener('click', () => showDetail(POI_BY_ID[el.dataset.id]));
-  });
+  $('sheet-body').querySelectorAll('[data-open]').forEach((el) =>
+    el.addEventListener('click', () => showDetail(POI_BY_ID[el.dataset.open])));
+  $('sheet-body').querySelectorAll('[data-guide]').forEach((el) =>
+    el.addEventListener('click', () => startGuide(POI_BY_ID[el.dataset.guide])));
 }
 
 // ---- on-site coordinate capture ----
@@ -256,6 +313,51 @@ function captureReading() {
     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
 }
 
+// ---- adaptive Bonderam banner ----
+function distToEvent() {
+  if (!coords) return null;
+  const { lat, lon } = FESTIVAL.mainEvent;
+  const d = haversine(coords.latitude, coords.longitude, lat, lon);
+  return { d, eta: walkEta(d), brg: bearing(coords.latitude, coords.longitude, lat, lon) };
+}
+function fmtCountdown(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  return h >= 1 ? `${h}h ${String(m).padStart(2, '0')}m` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+}
+const fmtClock = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
+function updateSmart() {
+  const el = $('smart');
+  if (!el || el.style.display === 'none') return;
+  const now = Date.now();
+  const start = Date.parse(FESTIVAL.startsAt);
+  const end = Date.parse(FESTIVAL.endsAt);
+  const de = distToEvent();
+  const where = de ? `${fmtDist(de.d)} ${compass16(de.brg)} \u00B7 ~${de.eta} min walk` : '';
+  let phase, html;
+  if (now >= end) {
+    phase = 'after';
+    html = `<b>Explore Divar</b> \u00B7 tap for the main event`;
+  } else if (now >= start) {
+    phase = 'live';
+    const floaty = now < Date.parse(FESTIVAL.floatAt) ? 'float parade at 4 PM' : 'float parade underway';
+    html = `<b>\u{1F389} Bonderam is LIVE</b> \u00B7 ${de ? 'main event ' + where : floaty}`;
+  } else {
+    const ms = start - now;
+    if (ms <= 6 * 3600 * 1000 && de) {
+      phase = 'soon';
+      const leaveBy = new Date(start - de.eta * 60 * 1000);
+      html = `<b>\u23F3 Starts in ${fmtCountdown(ms)}</b> \u00B7 you\u2019re ${where} \u00B7 leave by ${fmtClock(leaveBy)}`;
+    } else {
+      phase = 'before';
+      html = `<b>\u{1F6A9} Bonderam in ${fmtCountdown(ms)}</b> \u00B7 ${de ? 'main event ' + where : 'Sat 22 Aug, 3 PM'}`;
+    }
+  }
+  el.dataset.phase = phase;
+  el.innerHTML = html;
+}
+
 // ---- transient banner ----
 let bannerTimer;
 function banner(msg) {
@@ -275,12 +377,12 @@ function banner(msg) {
 }
 
 // ---- wire UI ----
-build();
 $('btn-start').addEventListener('click', start);
 $('btn-demo').addEventListener('click', () => { DEMO ? start() : (location.search = '?demo=1'); });
 $('btn-sites').addEventListener('click', renderSites);
 $('btn-capture').addEventListener('click', renderCapture);
 $('sheet-close').addEventListener('click', closeSheet);
+$('guide-stop').addEventListener('click', stopGuide);
 $('smart').addEventListener('click', () => showDetail(POI_BY_ID[FESTIVAL.mainEvent.id]));
 
 if (DEMO) start();

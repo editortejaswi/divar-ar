@@ -11,6 +11,7 @@
       --panel: rgba(16, 19, 27, 0.86);
       --stroke: rgba(255, 255, 255, 0.12);
       --gold: #ffd27f;
+      --go: #2fd47a;
       --text: #f2f4f8;
       --muted: #9aa3b2;
       --safe-t: env(safe-area-inset-top, 0px);
@@ -19,7 +20,8 @@
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg);
       color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
-    #glscene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    /* transparent canvas over the live camera <video> LocAR injects (z-index -100) */
+    #glscene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; background: transparent; }
 
     /* ---- start screen ---- */
     #start { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
@@ -32,6 +34,8 @@
       background: var(--panel); color: var(--text); font-size: 16px; font-weight: 600;
       padding: 14px 22px; cursor: pointer; backdrop-filter: blur(8px); }
     .btn.primary { background: var(--gold); color: #201700; border-color: transparent; }
+    .btn.go { background: var(--go); color: #04240f; border-color: transparent; }
+    .btn.wide { width: 100%; margin-top: 12px; }
     .btn:active { transform: scale(0.97); }
     #start .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
     .note { color: var(--muted); font-size: 12.5px; max-width: 360px; line-height: 1.5; }
@@ -57,6 +61,15 @@
     #smart[data-phase="live"] { border-left-color: #57e08a; }
     #smart[data-phase="after"] { border-left-color: var(--stroke); }
 
+    /* ---- active guidance bar ---- */
+    #guide { position: fixed; left: 10px; right: 10px; bottom: calc(var(--safe-b) + 74px);
+      z-index: 25; display: none; align-items: center; gap: 10px; padding: 11px 12px 11px 15px;
+      border-radius: 14px; background: var(--panel); border: 1px solid var(--stroke);
+      border-left: 4px solid var(--go); backdrop-filter: blur(10px); font-size: 13.5px; font-weight: 600; }
+    #guide #guide-txt { flex: 1; }
+    #guide #guide-stop { appearance: none; border: none; background: rgba(255,255,255,0.12);
+      color: var(--text); width: 30px; height: 30px; border-radius: 50%; font-size: 15px; cursor: pointer; flex: none; }
+
     /* ---- toolbar ---- */
     #toolbar { position: fixed; bottom: calc(var(--safe-b) + 14px); left: 0; right: 0;
       z-index: 20; display: none; justify-content: center; gap: 10px; }
@@ -64,7 +77,7 @@
 
     /* ---- bottom sheet ---- */
     #sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; transform: translateY(110%);
-      transition: transform 0.28s ease; max-height: 78vh; display: flex; flex-direction: column;
+      transition: transform 0.28s ease; max-height: 80vh; display: flex; flex-direction: column;
       background: var(--panel); border-top-left-radius: 20px; border-top-right-radius: 20px;
       border: 1px solid var(--stroke); backdrop-filter: blur(14px);
       padding: 10px 18px calc(var(--safe-b) + 18px); }
@@ -83,15 +96,19 @@
       background: none; border: none; cursor: pointer; }
 
     /* sites list */
-    .site { display: flex; align-items: center; gap: 12px; padding: 12px 6px;
-      border-bottom: 1px solid var(--stroke); cursor: pointer; }
+    .site { display: flex; align-items: center; gap: 10px; padding: 11px 4px;
+      border-bottom: 1px solid var(--stroke); }
     .site:last-child { border-bottom: none; }
-    .site .ic { font-size: 26px; width: 34px; text-align: center; }
+    .site .ic { font-size: 25px; width: 32px; text-align: center; }
+    .site .main { min-width: 0; cursor: pointer; }
     .site .name { font-weight: 600; font-size: 15px; }
-    .site .where { color: var(--muted); font-size: 12.5px; }
+    .site .where { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .site .dist { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
     .site .dist .d { font-weight: 700; }
     .site .dist .b { color: var(--muted); font-size: 12px; }
+    .site .row-guide { flex: none; appearance: none; border: none; background: rgba(47,212,122,0.16);
+      color: var(--go); font-weight: 800; width: 42px; height: 42px; border-radius: 12px; font-size: 17px; cursor: pointer; }
+    .site .row-guide:active { transform: scale(0.94); }
 
     /* capture tool */
     .cap-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
@@ -111,6 +128,11 @@
 
   <div id="smart"></div>
 
+  <div id="guide">
+    <span id="guide-txt">&#10148;</span>
+    <button id="guide-stop" title="Stop guiding">&times;</button>
+  </div>
+
   <div id="toolbar">
     <button class="btn" id="btn-sites">&#9776; Sites</button>
     <button class="btn" id="btn-capture">&#128205; Capture</button>
@@ -126,14 +148,13 @@
     <div class="flag">&#128681;</div>
     <h1>Divar Heritage AR</h1>
     <p class="sub">Explore Divar&rsquo;s churches, temple ruins and ferries in AR &mdash;
-      and find your way to the <b>Bonderam</b> festival.</p>
+      and let the arrow guide you to the <b>Bonderam</b> festival.</p>
     <div class="row">
       <button class="btn primary" id="btn-start">Start AR</button>
       <button class="btn" id="btn-demo">Preview (fake GPS)</button>
     </div>
     <p class="note">Best outdoors with a clear sky view. Allow <b>camera</b>,
-      <b>location</b> and <b>motion</b> when prompted. Some spots use approximate
-      coordinates &mdash; use &#128205; Capture on-site to record the exact location.</p>
+      <b>location</b> and <b>motion</b> when prompted.</p>
   </div>
 
   <script type="module" src="/src/main.js"></script>
