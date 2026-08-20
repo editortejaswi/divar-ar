@@ -1,0 +1,24 @@
+{
+  "name": "divar-heritage-ar",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Geolocation-based web AR heritage walking tour of Divar Island, Goa.",
+  "scripts": {
+    "dev": "vite",
+    "dev:phone": "HTTPS=1 vite --host",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "locar": "^0.2.7",
+    "three": "^0.181.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^2.1.0",
+    "jsqr": "^1.4.0",
+    "pngjs": "^7.0.0",
+    "qrcode": "^1.5.4",
+    "vite": "^7.1.5"
+  }
+}

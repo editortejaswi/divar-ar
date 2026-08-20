@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0e14" />
+  <title>Divar Heritage AR</title>
+  <style>
+    :root {
+      --bg: #0b0e14;
+      --panel: rgba(16, 19, 27, 0.86);
+      --stroke: rgba(255, 255, 255, 0.12);
+      --gold: #ffd27f;
+      --text: #f2f4f8;
+      --muted: #9aa3b2;
+      --safe-t: env(safe-area-inset-top, 0px);
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg);
+      color: var(--text); font-family: system-ui, -apple-system, sans-serif; }
+    #glscene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; }
+
+    /* ---- start screen ---- */
+    #start { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center; padding: 24px;
+      background: radial-gradient(120% 90% at 50% 0%, #16233a 0%, #0b0e14 60%); gap: 14px; }
+    #start h1 { margin: 0; font-size: 30px; letter-spacing: 0.5px; }
+    #start .sub { color: var(--muted); max-width: 340px; line-height: 1.5; margin: 0; }
+    #start .flag { font-size: 46px; }
+    .btn { appearance: none; border: 1px solid var(--stroke); border-radius: 14px;
+      background: var(--panel); color: var(--text); font-size: 16px; font-weight: 600;
+      padding: 14px 22px; cursor: pointer; backdrop-filter: blur(8px); }
+    .btn.primary { background: var(--gold); color: #201700; border-color: transparent; }
+    .btn:active { transform: scale(0.97); }
+    #start .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .note { color: var(--muted); font-size: 12.5px; max-width: 360px; line-height: 1.5; }
+
+    /* ---- HUD ---- */
+    #hud { position: fixed; top: calc(var(--safe-t) + 10px); left: 10px; right: 10px;
+      z-index: 20; display: none; justify-content: space-between; align-items: center;
+      gap: 8px; padding: 10px 14px; border-radius: 14px; background: var(--panel);
+      border: 1px solid var(--stroke); backdrop-filter: blur(10px); font-size: 13px; }
+    #hud .near { font-weight: 600; }
+    #hud .acc { color: var(--muted); white-space: nowrap; }
+    #hud .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: #ff5c5c; margin-right: 6px; vertical-align: middle; }
+    #hud .dot.ok { background: #57e08a; }
+
+    /* ---- adaptive Bonderam banner ---- */
+    #smart { position: fixed; top: calc(var(--safe-t) + 58px); left: 10px; right: 10px;
+      z-index: 20; display: none; padding: 9px 14px; border-radius: 12px; background: var(--panel);
+      border: 1px solid var(--stroke); border-left: 4px solid var(--gold); backdrop-filter: blur(10px);
+      font-size: 12.5px; line-height: 1.35; cursor: pointer; }
+    #smart b { font-weight: 700; }
+    #smart[data-phase="soon"] { border-left-color: #ff9e3d; }
+    #smart[data-phase="live"] { border-left-color: #57e08a; }
+    #smart[data-phase="after"] { border-left-color: var(--stroke); }
+
+    /* ---- toolbar ---- */
+    #toolbar { position: fixed; bottom: calc(var(--safe-b) + 14px); left: 0; right: 0;
+      z-index: 20; display: none; justify-content: center; gap: 10px; }
+    #toolbar .btn { padding: 12px 18px; font-size: 15px; }
+
+    /* ---- bottom sheet ---- */
+    #sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; transform: translateY(110%);
+      transition: transform 0.28s ease; max-height: 78vh; display: flex; flex-direction: column;
+      background: var(--panel); border-top-left-radius: 20px; border-top-right-radius: 20px;
+      border: 1px solid var(--stroke); backdrop-filter: blur(14px);
+      padding: 10px 18px calc(var(--safe-b) + 18px); }
+    #sheet.open { transform: translateY(0); }
+    #sheet .grip { width: 42px; height: 5px; border-radius: 3px; background: var(--stroke);
+      margin: 6px auto 10px; }
+    #sheet .body { overflow-y: auto; }
+    #sheet h2 { margin: 4px 0 2px; font-size: 21px; }
+    #sheet .alt { color: var(--muted); font-size: 13.5px; margin: 0 0 10px; }
+    #sheet .meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
+    .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--stroke);
+      color: var(--muted); }
+    .chip.strong { color: var(--text); }
+    #sheet p.desc { line-height: 1.55; font-size: 15px; margin: 0 0 6px; }
+    .sheet-close { position: absolute; top: 12px; right: 14px; font-size: 22px; color: var(--muted);
+      background: none; border: none; cursor: pointer; }
+
+    /* sites list */
+    .site { display: flex; align-items: center; gap: 12px; padding: 12px 6px;
+      border-bottom: 1px solid var(--stroke); cursor: pointer; }
+    .site:last-child { border-bottom: none; }
+    .site .ic { font-size: 26px; width: 34px; text-align: center; }
+    .site .name { font-weight: 600; font-size: 15px; }
+    .site .where { color: var(--muted); font-size: 12.5px; }
+    .site .dist { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
+    .site .dist .d { font-weight: 700; }
+    .site .dist .b { color: var(--muted); font-size: 12px; }
+
+    /* capture tool */
+    .cap-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
+      border-bottom: 1px solid var(--stroke); font-variant-numeric: tabular-nums; font-size: 13.5px; }
+    .cap-row .n { color: var(--muted); width: 20px; }
+    .cap-empty { color: var(--muted); font-size: 14px; padding: 14px 4px; line-height: 1.5; }
+    .cap-actions { display: flex; gap: 10px; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <canvas id="glscene"></canvas>
+
+  <div id="hud">
+    <span class="near" id="hud-near">Locating&hellip;</span>
+    <span class="acc"><span class="dot" id="hud-dot"></span><span id="hud-acc">GPS &ndash;</span></span>
+  </div>
+
+  <div id="smart"></div>
+
+  <div id="toolbar">
+    <button class="btn" id="btn-sites">&#9776; Sites</button>
+    <button class="btn" id="btn-capture">&#128205; Capture</button>
+  </div>
+
+  <div id="sheet">
+    <div class="grip"></div>
+    <button class="sheet-close" id="sheet-close">&times;</button>
+    <div class="body" id="sheet-body"></div>
+  </div>
+
+  <div id="start">
+    <div class="flag">&#128681;</div>
+    <h1>Divar Heritage AR</h1>
+    <p class="sub">Explore Divar&rsquo;s churches, temple ruins and ferries in AR &mdash;
+      and find your way to the <b>Bonderam</b> festival.</p>
+    <div class="row">
+      <button class="btn primary" id="btn-start">Start AR</button>
+      <button class="btn" id="btn-demo">Preview (fake GPS)</button>
+    </div>
+    <p class="note">Best outdoors with a clear sky view. Allow <b>camera</b>,
+      <b>location</b> and <b>motion</b> when prompted. Some spots use approximate
+      coordinates &mdash; use &#128205; Capture on-site to record the exact location.</p>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
