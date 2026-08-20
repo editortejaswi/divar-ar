@@ -74,6 +74,7 @@ async function start() {
   app = new App({
     cameraOptions: { hFov: 80, near: 0.1, far: 8000 },
     canvas: $('glscene'),
+    videoConstraints: { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
     deviceOrientationOptions: { enabled: !DEMO },
     gpsOptions: { gpsMinAccuracy: DEMO ? 1e6 : 100 },
   });
@@ -83,25 +84,31 @@ async function start() {
   });
   locar = app.locar;
 
-  if (DEBUG) {
-    app.webcam.on('webcamstarted', (ev) => dlog(`webcamstarted ${ev.videoWidth}x${ev.videoHeight}`));
-    app.webcam.on('webcamerror', (ev) => dlog(`WEBCAM ERR ${ev.code}: ${ev.message}`));
-    refreshDbg();
-    setInterval(refreshDbg, 1000);
+  // iOS: harden the webcam <video> the instant LocAR creates it (still inside the tap).
+  const v = document.querySelector('video');
+  if (v) {
+    v.muted = true; v.defaultMuted = true; v.playsInline = true;
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.setAttribute('autoplay', '');
   }
+
+  // Always-on camera status so a failure is visible on screen (not only ?debug).
+  app.webcam.on('webcamstarted', () => { camStatus(null); if (DEBUG) dlog('webcamstarted'); });
+  app.webcam.on('webcamerror', (ev) => {
+    camStatus(`Camera blocked (${ev.code}). In Safari tap \u201caA\u201d in the address bar \u2192 Website Settings \u2192 Camera \u2192 Allow, then reload. (Sites & the arrow still work without it.)`);
+    if (DEBUG) dlog(`WEBCAM ERR ${ev.code}: ${ev.message}`);
+  });
+  if (DEBUG) { refreshDbg(); setInterval(refreshDbg, 1000); }
 
   try {
     await app.start();
-    dlog('app.start resolved');
+    if (DEBUG) dlog('app.start resolved');
   } catch (err) {
-    dlog(`app.start REJECT ${err.code}: ${err.message}`);
+    if (DEBUG) dlog(`app.start REJECT ${err.code}: ${err.message}`);
     console.warn('AR sensors unavailable:', err);
-    banner('Camera or motion unavailable \u2014 use \u2630 Sites for a list & directions.');
   }
 
-  // Belt-and-braces for iOS Safari: inline + muted + play within this gesture.
-  const v = document.querySelector('video');
-  if (v) { v.muted = true; v.setAttribute('playsinline', ''); v.play().then(() => dlog('video.play() ok')).catch((e) => dlog('video.play() fail ' + e.name)); }
+  // (re)play within the gesture chain
+  if (v) v.play().then(() => { if (DEBUG) dlog('video.play() ok'); }).catch((e) => camStatus(`Camera acquired but couldn\u2019t play (${e.name}). Reload, and close other apps using the camera.`));
 
   locar.on('gpserror', (err) => banner(`GPS error (${err.code}). Move outdoors for a clear sky view.`));
   locar.on('gpsupdate', (ev) => {
@@ -115,6 +122,21 @@ async function start() {
 
   if (DEMO) locar.fakeGps(DEMO_ORIGIN.lon, DEMO_ORIGIN.lat);
   else locar.startGps();
+}
+
+function camStatus(msg) {
+  let el = $('camstatus');
+  if (!msg) { if (el) el.style.display = 'none'; return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'camstatus';
+    el.style.cssText = 'position:fixed;left:12px;right:12px;top:calc(var(--safe-t) + 108px);z-index:35;' +
+      'background:rgba(90,20,32,0.92);border:1px solid #ff6b81;color:#ffdbe1;border-radius:12px;' +
+      'padding:11px 14px;font-size:13px;line-height:1.45;backdrop-filter:blur(10px);text-align:center';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.display = 'block';
 }
 
 // ---- place POI labels (valid only after first fix) ----
