@@ -159,15 +159,66 @@ function refresh() {
 }
 
 // ---- 3D arrow wayfinding ----------------------------------------------------
+let holoEnv = null;
+function makeHoloEnv(renderer) {
+  if (holoEnv) return holoEnv;
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 512;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 1024, 512);
+  grd.addColorStop(0.00, '#001b3a'); grd.addColorStop(0.22, '#00e5ff');
+  grd.addColorStop(0.44, '#7a5cff'); grd.addColorStop(0.62, '#ff2fd0');
+  grd.addColorStop(0.80, '#2f7bff'); grd.addColorStop(1.00, '#eaf6ff');
+  g.fillStyle = grd; g.fillRect(0, 0, 1024, 512);
+  for (const [x, y, r, col] of [[300, 130, 130, 'rgba(255,255,255,0.95)'], [780, 370, 160, 'rgba(190,255,255,0.7)']]) {
+    const rg = g.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, col); rg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = rg; g.fillRect(0, 0, 1024, 512);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const rt = pmrem.fromEquirectangular(tex);
+  tex.dispose(); pmrem.dispose();
+  holoEnv = rt.texture;
+  return holoEnv;
+}
+
 function ensureArrow() {
   if (arrow) return arrow;
-  const mat = new THREE.MeshBasicMaterial({ color: 0x2fd47a, depthTest: false });
+  const env = makeHoloEnv(app.renderer);
+  app.scene.environment = env;
+  app.scene.add(new THREE.HemisphereLight(0xffffff, 0x223344, 1.1));
+  const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+  dir.position.set(1, 2, 1);
+  app.scene.add(dir);
+
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0x9fdcff, metalness: 0.15, roughness: 0.06,
+    transparent: true, opacity: 0.7, depthWrite: false,
+    envMap: env, envMapIntensity: 1.7,
+    clearcoat: 1.0, clearcoatRoughness: 0.06,
+    iridescence: 1.0, iridescenceIOR: 1.35, iridescenceThicknessRange: [130, 500],
+    side: THREE.DoubleSide,
+  });
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uRim = { value: new THREE.Color(0x7af0ff) };
+    shader.fragmentShader = 'uniform vec3 uRim;\n' + shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      `float fres = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);
+       gl_FragColor.rgb += uRim * fres * 1.3;
+       gl_FragColor.a = clamp(gl_FragColor.a + fres * 0.55, 0.0, 1.0);
+       #include <dithering_fragment>`
+    );
+  };
+
   arrow = new THREE.Group();
-  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 1.7), mat);
-  shaft.position.z = 0.75;
-  const head = new THREE.Mesh(new THREE.ConeGeometry(0.95, 1.5, 4), mat);
-  head.rotation.x = -Math.PI / 2;                   // apex -> -Z (forward)
-  head.position.z = -0.75;
+  const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 1.6), mat);
+  shaft.position.z = 0.7;
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.92, 1.4, 6), mat);
+  head.rotation.x = -Math.PI / 2;
+  head.position.z = -0.78;
   arrow.add(shaft, head);
   arrow.scale.setScalar(0.5);
   arrow.renderOrder = 20;
