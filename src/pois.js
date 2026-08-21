@@ -18,7 +18,7 @@ export const FESTIVAL = {
   startsAt: '2026-08-22T15:00:00+05:30',
   floatAt: '2026-08-22T16:00:00+05:30',
   endsAt: '2026-08-22T21:00:00+05:30',
-  mainEvent: { id: 'main-event', lat: 15.5260, lon: 73.9008 }, // APPROX - keep in sync with POI below
+  mainEvent: { id: 'main-event', lat: 15.527725, lon: 73.904737 }, // on-site capture; keep in sync with POI below
 };
 
 export const POIS = [
@@ -29,10 +29,10 @@ export const POIS = [
     layer: 'festival',
     kind: 'event',
     year: 'Sat 22 Aug',
-    lat: 15.5260,
-    lon: 73.9008,
+    lat: 15.527725,
+    lon: 73.904737,
     elev: 5,
-    verified: false,
+    verified: true,
     blurb:
       'Heart of Bonderam, Divar\u2019s flag festival. Brass bands wake the ' +
       'village at 5 am; the President opens the festival at 3 pm with the ' +
@@ -98,8 +98,8 @@ export const POIS = [
     layer: 'heritage',
     kind: 'ferry',
     year: 'arrival',
-    lat: 15.5090557,
-    lon: 73.912458,
+    lat: 15.509075,
+    lon: 73.912565,
     elev: 3,
     verified: true,
     blurb:
@@ -109,14 +109,14 @@ export const POIS = [
   {
     id: 'ribandar-ferry',
     name: 'Ribandar Ferry Ramp',
-    alt: 'Divar \u21C4 Ribandar \u2014 mainland jetty (need Divar ramp)',
+    alt: 'Divar \u21C4 Ribandar (southwest)',
     layer: 'heritage',
     kind: 'ferry',
     year: 'arrival',
-    lat: 15.5051499,
-    lon: 73.8786674,
+    lat: 15.505305,
+    lon: 73.878804,
     elev: 3,
-    verified: false, // pin is the Ribandar (mainland) jetty; need the Divar-side ramp
+    verified: true,
     blurb:
       'Southwestern ferry to Ribandar on the Panjim\u2013Old Goa causeway \u2014 ' +
       'one of the three flat-ferries that are the island\u2019s only access; carry small change.',
@@ -128,8 +128,8 @@ export const POIS = [
     layer: 'heritage',
     kind: 'ferry',
     year: 'arrival',
-    lat: 15.5391314,
-    lon: 73.9229133,
+    lat: 15.538976,
+    lon: 73.92314,
     elev: 3,
     verified: true,
     blurb:
@@ -143,4 +143,4 @@ export const POIS = [
 export const DIVAR_CENTER = { lat: 15.5455, lon: 73.9220 };
 
 // Demo origin for `?demo=1` (fake GPS) — Piedade, just south of the main event.
-export const DEMO_ORIGIN = { lat: 15.5250, lon: 73.8996 };
+export const DEMO_ORIGIN = { lat: 15.509075, lon: 73.912565 };

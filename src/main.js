@@ -4,8 +4,9 @@ import { POIS, FESTIVAL, DEMO_ORIGIN } from './pois.js';
 import { makeLabelSprite, KIND } from './labels.js';
 import { haversine, bearing, compass16, fmtDist } from './geo.js';
 import logoUrl from '../qr/bonderam-logo.webp';
-import { relAngle, cueFor } from './guide-math.js';
+import { relAngle, cueFor, nearestOnPoly, alongPoly } from './guide-math.js';
 import mapUrl from './divar-map.webp';
+import { ROUTES, ROUTE_DEST } from './routes.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -24,6 +25,7 @@ let hubProj = null;
 let capSel = null;        // poi id selected in the capture tool
 let voiceOn = false;      // AR voice disabled (logic kept; toggle hidden). Flip true + unhide #ar-voice to re-enable.
 let vCue = '', vAt = 0, vDist = null; // last spoken cue / time / distance
+let sCam = null;          // smoothed camera XZ (low-pass GPS jitter so the ground path doesn't snap/flicker)
 
 // ---- travel mode + ETA ----
 const SPEED = { walk: 80, drive: 350 };   // metres / minute (~4.8 & ~21 km/h)
@@ -238,7 +240,7 @@ function startGuide(poi) {
   if (!rafId) tickGuide();
 }
 function stopGuide() {
-  guideId = null; vCue = '';
+  guideId = null; vCue = ''; sCam = null;
   if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
   if (arrow) arrow.visible = false;
   for (const c of chevrons) c.visible = false;
@@ -293,7 +295,7 @@ function ensureArrow() {
   app.scene.add(arrow);
   return arrow;
 }
-const PATH_N = 4, PATH_SPACING = 6.5, PATH_START = 2.5, PATH_SPEED = 2.0;
+const PATH_N = 6, PATH_SPACING = 6.5, PATH_START = 2.5, PATH_SPEED = 2.0;
 const PATH_COLORS = [0xffd23f, 0x2fd47a, 0xff2fd0, 0x9a7bff, 0xff77c2, 0x38b6ff, 0xff8a3d];
 const PATH_COLOR_OBJS = PATH_COLORS.map((h) => new THREE.Color(h));
 function chevGeom() {
@@ -306,38 +308,87 @@ function ensurePath() {
   const geo = chevGeom();
   for (let i = 0; i < PATH_N; i++) {
     const mat = new THREE.MeshBasicMaterial({ color: 0x39e0a0, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, depthTest: false });
-    const mesh = new THREE.Mesh(geo, mat); mesh.scale.setScalar(4); mesh.renderOrder = 15; mesh.visible = false;
+    const mesh = new THREE.Mesh(geo, mat); mesh.scale.setScalar(4); mesh.renderOrder = 15 + i; mesh.visible = false;
     app.scene.add(mesh); chevrons.push(mesh);
   }
+}
+// ---- road-following (baked OSRM routes; see routes.js) ----
+const _routeCache = {};   // id -> { poly, lat, lon } (rebuilt only when the venue coord changes)
+const _camXZ = new THREE.Vector2();
+function routeWorldPoly(id) {
+  const base = ROUTES[id]; if (!base) return null;
+  const venue = POI_BY_ID[ROUTE_DEST];
+  const end = base[base.length - 1];
+  if (venue && haversine(end[0], end[1], venue.lat, venue.lon) > 50) return null; // venue re-published far away -> route stale
+  const c = _routeCache[id];
+  if (c && (!venue || (c.lat === venue.lat && c.lon === venue.lon))) return c.poly;
+  try {
+    const poly = base.map(([lat, lon]) => { const [x, z] = locar.lonLatToWorldCoords(lon, lat); return { x, z }; });
+    if (venue) { const [x, z] = locar.lonLatToWorldCoords(venue.lon, venue.lat); poly[poly.length - 1] = { x, z }; } // end at the live marker
+    if (poly.some((p) => !Number.isFinite(p.x) || !Number.isFinite(p.z))) return null;
+    _routeCache[id] = { poly, lat: venue ? venue.lat : null, lon: venue ? venue.lon : null };
+    return poly;
+  } catch (e) { return null; }   // origin not set yet
+}
+function pickRoute(px, pz) {
+  let best = null;
+  for (const id of Object.keys(ROUTES)) {
+    const poly = routeWorldPoly(id); if (!poly) continue;
+    const np = nearestOnPoly(px, pz, poly);
+    if (!best || np.dist < best.np.dist) best = { id, poly, np };
+  }
+  return best && best.np.dist < 80 ? best : null;   // follow the road only when within 80 m of it
 }
 function tickGuide() {
   rafId = requestAnimationFrame(tickGuide);
   if (!guideId || !arrow || !app) return;
   const m = markers.find((x) => x.poi.id === guideId);
   if (!m) { arrow.visible = false; for (const c of chevrons) c.visible = false; return; }
-  const cam = app.camera; const groundY = cam.position.y - 1.7;
-  const pdir = new THREE.Vector3().subVectors(m.sprite.position, cam.position); pdir.y = 0;
-  const targetDist = pdir.length(); if (targetDist < 1e-3) pdir.set(0, 0, -1); else pdir.normalize();
-  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion); fwd.y = 0;
-  if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
+  const cam = app.camera, groundY = cam.position.y - 1.7, t = performance.now() / 1000, L = PATH_COLOR_OBJS.length;
   const bob = Math.sin(performance.now() / 300) * 0.08;
-  arrow.position.copy(cam.position).addScaledVector(fwd, 6); arrow.position.y = cam.position.y + 0.4 + bob;
-  const at = m.sprite.position.clone(); at.y = arrow.position.y; arrow.lookAt(at); arrow.visible = true;
-  const e = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ'); // yaw only, pitch-independent
-  guideVoice(relAngle(e.y, pdir.x, pdir.z), targetDist);
-  const flow = (performance.now() / 1000 * PATH_SPEED) % PATH_SPACING;
-  const maxD = Math.min(targetDist - 1.5, PATH_START + PATH_N * PATH_SPACING);
-  const L = PATH_COLOR_OBJS.length, t = performance.now() / 1000;
-  for (let i = 0; i < chevrons.length; i++) {
-    const c = chevrons[i]; const d = PATH_START + flow + i * PATH_SPACING;
-    if (d > maxD) { c.visible = false; continue; }
-    c.position.copy(cam.position).addScaledVector(pdir, d); c.position.y = groundY;
-    c.lookAt(c.position.x + pdir.x, groundY, c.position.z + pdir.z);
-    const ph = ((d / 5 - t * 0.5) % L + L) % L, a = Math.floor(ph), b = (a + 1) % L;
-    c.material.color.copy(PATH_COLOR_OBJS[a]).lerp(PATH_COLOR_OBJS[b], ph - a);
-    const fadeIn = Math.min(1, (d - PATH_START) / 3), fadeOut = Math.min(1, (maxD - d) / 4);
-    c.material.opacity = 0.9 * Math.max(0, Math.min(fadeIn, fadeOut));
-    c.visible = c.material.opacity > 0.02;
+  if (!sCam) sCam = new THREE.Vector2(cam.position.x, cam.position.z);
+  else sCam.lerp(_camXZ.set(cam.position.x, cam.position.z), 0.12);
+  const camFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion); camFwd.y = 0;
+  if (camFwd.lengthSq() < 1e-6) camFwd.set(0, 0, -1); camFwd.normalize();
+
+  const route = guideId === ROUTE_DEST ? pickRoute(sCam.x, sCam.y) : null;
+  if (DEBUG) dlog('route=' + (route ? route.id + ' d' + route.np.dist.toFixed(0) : 'straight'));
+  const flow = (t * PATH_SPEED) % PATH_SPACING;
+
+  // arrow points along the road (next turn) when on a route, else straight at the POI
+  let tgt;
+  if (route) { const la = alongPoly(route.poly, route.np.seg, route.np.t, 9); tgt = new THREE.Vector3(la.x, groundY, la.z); }
+  else tgt = m.sprite.position.clone();
+  arrow.position.set(cam.position.x + camFwd.x * 6, cam.position.y + 0.4 + bob, cam.position.z + camFwd.z * 6);
+  arrow.lookAt(tgt.x, arrow.position.y, tgt.z); arrow.visible = true;
+
+  const eul = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ');
+  guideVoice(relAngle(eul.y, tgt.x - sCam.x, tgt.z - sCam.y), Math.hypot(m.sprite.position.x - sCam.x, m.sprite.position.z - sCam.y));
+
+  if (route) {
+    for (let i = 0; i < chevrons.length; i++) {
+      const c = chevrons[i], d = PATH_START + flow + i * PATH_SPACING, p = alongPoly(route.poly, route.np.seg, route.np.t, d);
+      c.position.set(p.x, groundY, p.z); c.lookAt(p.x + p.dx, groundY, p.z + p.dz);
+      const ph = ((d / 5 - t * 0.5) % L + L) % L, a = Math.floor(ph), b = (a + 1) % L;
+      c.material.color.copy(PATH_COLOR_OBJS[a]).lerp(PATH_COLOR_OBJS[b], ph - a);
+      c.material.opacity = 0.92 * Math.min(1, (d - PATH_START) / 3) * (p.end ? 0 : 1);
+      c.visible = c.material.opacity > 0.02;
+    }
+  } else {
+    const pdir = new THREE.Vector3(m.sprite.position.x - sCam.x, 0, m.sprite.position.z - sCam.y);
+    const targetDist = pdir.length(); if (targetDist < 1e-3) pdir.set(0, 0, -1); else pdir.normalize();
+    const maxD = Math.min(targetDist - 1.5, PATH_START + PATH_N * PATH_SPACING);
+    for (let i = 0; i < chevrons.length; i++) {
+      const c = chevrons[i], d = PATH_START + flow + i * PATH_SPACING;
+      if (d > maxD) { c.visible = false; continue; }
+      c.position.set(sCam.x + pdir.x * d, groundY, sCam.y + pdir.z * d);
+      c.lookAt(c.position.x + pdir.x, groundY, c.position.z + pdir.z);
+      const ph = ((d / 5 - t * 0.5) % L + L) % L, a = Math.floor(ph), b = (a + 1) % L;
+      c.material.color.copy(PATH_COLOR_OBJS[a]).lerp(PATH_COLOR_OBJS[b], ph - a);
+      const fadeIn = Math.min(1, (d - PATH_START) / 3), fadeOut = Math.min(1, (maxD - d) / 4);
+      c.material.opacity = 0.9 * Math.max(0, Math.min(fadeIn, fadeOut));
+      c.visible = c.material.opacity > 0.02;
+    }
   }
 }
 
