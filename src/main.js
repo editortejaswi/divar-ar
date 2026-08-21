@@ -279,7 +279,7 @@ function ensureArrow() {
 }
 
 // ---- ground chevron trail (Maps Live-View style path) ----
-const PATH_N = 10, PATH_SPACING = 4, PATH_START = 3, PATH_SPEED = 2.2;
+const PATH_N = 10, PATH_SPACING = 6, PATH_START = 7, PATH_SPEED = 2.6;
 // Bonderam festive palette, cycled along the path so it flows as a rainbow.
 const PATH_COLORS = [0xffd23f, 0x2fd47a, 0xff2fd0, 0x9a7bff, 0xff77c2, 0x38b6ff, 0xff8a3d];
 function chevronGeom() {
@@ -300,7 +300,7 @@ function ensurePath() {
       side: THREE.DoubleSide, depthWrite: false, depthTest: false,
     });
     const mesh = new THREE.Mesh(geo, mat);
-    mesh.scale.setScalar(2);
+    mesh.scale.setScalar(4);
     mesh.renderOrder = 15;
     mesh.visible = false;
     app.scene.add(mesh);
