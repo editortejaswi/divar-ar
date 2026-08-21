@@ -23,6 +23,7 @@ let capSel = null;        // poi id selected in the capture tool
 
 // ---- travel mode + ETA ----
 const SPEED = { walk: 80, drive: 350 };   // metres / minute (~4.8 & ~21 km/h)
+const ARRIVE_R = 10;                       // metres - "you've arrived" radius (was 25)
 let mode = 'walk';
 const eta = (m) => Math.max(1, Math.round(m / SPEED[mode]));
 const modeIcon = () => (mode === 'walk' ? '\u{1F6B6}' : '\u{1F697}');
@@ -105,7 +106,7 @@ function refresh() {
   if (guideId) {
     updateArBar();
     const g = POI_BY_ID[guideId];
-    if (haversine(coords.latitude, coords.longitude, g.lat, g.lon) < 25) showArrival(g);
+    if (haversine(coords.latitude, coords.longitude, g.lat, g.lon) < ARRIVE_R) showArrival(g);
   }
   if ($('hub').style.display !== 'none') { renderHubList(); positionMe(); }
   updateFest();
@@ -189,7 +190,7 @@ function updateFest() {
 function chooseDest(poi) {
   $('hub').style.display = 'none';
   $('arbar').style.display = 'flex';
-  if (coords && haversine(coords.latitude, coords.longitude, poi.lat, poi.lon) < 25) { showArrival(poi); return; }
+  if (coords && haversine(coords.latitude, coords.longitude, poi.lat, poi.lon) < ARRIVE_R) { showArrival(poi); return; }
   startGuide(poi);
 }
 function openExplore() {
