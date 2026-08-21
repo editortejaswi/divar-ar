@@ -109,14 +109,14 @@ export const POIS = [
   {
     id: 'ribandar-ferry',
     name: 'Ribandar Ferry Ramp',
-    alt: 'Divar \u21C4 Ribandar (southwest)',
+    alt: 'Divar \u21C4 Ribandar \u2014 mainland jetty (need Divar ramp)',
     layer: 'heritage',
     kind: 'ferry',
     year: 'arrival',
     lat: 15.5051499,
     lon: 73.8786674,
     elev: 3,
-    verified: true,
+    verified: false, // pin is the Ribandar (mainland) jetty; need the Divar-side ramp
     blurb:
       'Southwestern ferry to Ribandar on the Panjim\u2013Old Goa causeway \u2014 ' +
       'one of the three free flat-ferries that are the island\u2019s only access.',
