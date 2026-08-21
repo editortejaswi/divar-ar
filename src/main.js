@@ -285,7 +285,7 @@ function ensureArrow() {
 }
 
 // ---- ground chevron trail (Maps Live-View style path) ----
-const PATH_N = 6, PATH_SPACING = 3.5, PATH_START = 2, PATH_SPEED = 2.0;
+const PATH_N = 4, PATH_SPACING = 6.5, PATH_START = 2.5, PATH_SPEED = 2.0;
 // Bonderam festive palette, cycled along the path so it flows as a rainbow.
 const PATH_COLORS = [0xffd23f, 0x2fd47a, 0xff2fd0, 0x9a7bff, 0xff77c2, 0x38b6ff, 0xff8a3d];
 const PATH_COLOR_OBJS = PATH_COLORS.map((h) => new THREE.Color(h));
