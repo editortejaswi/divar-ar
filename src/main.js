@@ -5,6 +5,7 @@ import { makeLabelSprite, KIND } from './labels.js';
 import { haversine, bearing, compass16, fmtDist } from './geo.js';
 import logoUrl from '../qr/bonderam-logo.webp';
 import { relAngle, cueFor } from './guide-math.js';
+import mapUrl from './divar-map.png';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -124,33 +125,33 @@ function showHub() {
   renderHubMap(); renderHubList(); updateFest();
 }
 
-function projector(pts) {
-  const lats = pts.map((p) => p.lat), lons = pts.map((p) => p.lon);
-  const meanLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-  const k = Math.cos((meanLat * Math.PI) / 180) || 1;
-  const xs = lons.map((l) => l * k);
-  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...lats), maxY = Math.max(...lats);
-  const spanX = (maxX - minX) || 1e-6, spanY = (maxY - minY) || 1e-6, pad = 15;
-  const scale = Math.min((100 - 2 * pad) / spanX, (100 - 2 * pad) / spanY);
-  const ox = (100 - spanX * scale) / 2, oy = (100 - spanY * scale) / 2;
-  return (lat, lon) => [ox + (lon * k - minX) * scale, oy + (maxY - lat) * scale];
+// Fixed Web-Mercator projection matching the stitched OSM map (src/divar-map.png).
+const MAP = { z: 14, x0: 11553, y0: 7474, wpx: 1280, hpx: 1280 };
+function mapProject(lat, lon) {
+  const n = 2 ** MAP.z;
+  const xt = (lon + 180) / 360 * n;
+  const r = (lat * Math.PI) / 180;
+  const yt = ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n;
+  return [((xt - MAP.x0) * 256) / MAP.wpx * 100, ((yt - MAP.y0) * 256) / MAP.hpx * 100];
 }
 
 function renderHubMap() {
-  const pts = POIS.slice();
-  if (coords) pts.push({ lat: coords.latitude, lon: coords.longitude });
-  hubProj = projector(pts);
+  hubProj = mapProject;
+  const el = $('hub-map');
+  el.style.height = 'auto'; el.style.minHeight = '0'; el.style.flex = 'none'; el.style.maxWidth = '520px'; el.style.margin = '0 auto';
   const mks = POIS.map((poi, i) => {
-    const [x, y] = hubProj(poi.lat, poi.lon);
+    const [x, y] = mapProject(poi.lat, poi.lon);
     const ic = (KIND[poi.kind] || KIND.church).icon;
     const short = poi.name.replace('Church of ', '').split(' ').slice(0, 2).join(' ');
     const z = poi.id === 'main-event' ? 6 : poi.id === 'piedade-church' ? 1 : 3; // Bonderam foreground, church behind
-    return `<button class="mk ${y < 20 ? 'up' : ''}" data-go="${poi.id}" style="left:${x}%;top:${y}%;z-index:${z}">
+    return `<button class="mk ${y < 12 ? 'up' : ''}" data-go="${poi.id}" style="left:${x}%;top:${y}%;z-index:${z}">
       <span class="dot" style="--c:${FEST_CSS[i % FEST_CSS.length]}">${ic}</span><span class="lbl">${short}</span></button>`;
   }).join('');
-  $('hub-map').innerHTML = `<div class="grid"></div><div class="sweep"></div>${mks}<div class="me" id="me-dot" style="display:none"></div>`;
+  el.innerHTML = `<img src="${mapUrl}" alt="Map of Divar Island" style="display:block;width:100%;height:auto">`
+    + `<div class="sweep"></div>${mks}<div class="me" id="me-dot" style="display:none"></div>`
+    + `<div style="position:absolute;right:6px;bottom:5px;z-index:8;font-size:9px;color:#0a1020;background:rgba(255,255,255,0.62);padding:1px 5px;border-radius:5px">\u00A9 OpenStreetMap</div>`;
   positionMe();
-  $('hub-map').querySelectorAll('[data-go]').forEach((el) => el.addEventListener('click', () => chooseDest(POI_BY_ID[el.dataset.go])));
+  el.querySelectorAll('[data-go]').forEach((x) => x.addEventListener('click', () => chooseDest(POI_BY_ID[x.dataset.go])));
 }
 function positionMe() {
   const me = $('me-dot'); if (!me || !hubProj) return;
