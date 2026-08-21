@@ -176,10 +176,38 @@ function refresh() {
     updateGuideBar();
     const g = POI_BY_ID[guideId];
     const gd = haversine(coords.latitude, coords.longitude, g.lat, g.lon);
-    if (gd < 20) { banner(`You\u2019ve reached ${g.name}. \u{1F389}`); stopGuide(); }
+    if (gd < 25) { showArrival(g); }
   }
   updateSmart();
 }
+
+function showArrival(poi) {
+  stopGuide();
+  navigator.vibrate?.([120, 60, 120]);
+  const meta = KIND[poi.kind] || KIND.church;
+  let el = $('arrive');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'arrive';
+    el.style.cssText = 'position:fixed;inset:0;z-index:45;display:flex;align-items:center;justify-content:center;' +
+      'padding:28px;background:rgba(4,10,8,0.55);backdrop-filter:blur(3px)';
+    document.body.appendChild(el);
+  }
+  el.innerHTML = '<div style="max-width:340px;width:100%;text-align:center;background:var(--panel);' +
+    'border:1px solid var(--stroke);border-top:4px solid var(--go);border-radius:20px;padding:26px 22px;' +
+    'backdrop-filter:blur(14px)">' +
+    '<div style="font-size:46px">\u{1F389}</div>' +
+    '<div style="font-size:22px;font-weight:800;margin:6px 0 2px">You\u2019ve arrived!</div>' +
+    '<div style="font-size:17px">' + meta.icon + ' ' + poi.name + '</div>' +
+    '<div style="color:var(--muted);font-size:13.5px;margin-top:8px;line-height:1.5">' + poi.alt + '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:18px">' +
+    '<button class="btn go" id="arrive-info" style="flex:1">View details</button>' +
+    '<button class="btn" id="arrive-ok" style="flex:1">Done</button></div></div>';
+  el.style.display = 'flex';
+  $('arrive-info').onclick = () => { el.style.display = 'none'; showDetail(poi); };
+  $('arrive-ok').onclick = () => { el.style.display = 'none'; };
+}
+if (DEBUG && params.get('arrive')) setTimeout(() => { const p = POI_BY_ID[params.get('arrive')]; if (p) showArrival(p); }, 700);
 
 // ---- 3D arrow wayfinding ----------------------------------------------------
 let holoEnv = null;
@@ -281,6 +309,12 @@ function ensurePath() {
 }
 
 function startGuide(poi) {
+  // Already at it (e.g. tapped a nearby label)? Skip the arrow, celebrate.
+  if (coords && haversine(coords.latitude, coords.longitude, poi.lat, poi.lon) < 25) {
+    closeSheet();
+    showArrival(poi);
+    return;
+  }
   ensureArrow();
   ensurePath();
   guideId = poi.id;
