@@ -159,7 +159,11 @@ const FEST_CSS = ['#ffd23f', '#2fd47a', '#ff2fd0', '#9a7bff', '#ff77c2', '#38b6f
 
 function renderHubList() {
   const rows = POIS.map((poi) => ({ poi, d: coords ? haversine(coords.latitude, coords.longitude, poi.lat, poi.lon) : null }));
-  if (coords) rows.sort((a, b) => a.d - b.d);
+  rows.sort((a, b) => {
+    if (a.poi.id === 'main-event') return -1;   // Bonderam 2026 always first
+    if (b.poi.id === 'main-event') return 1;
+    return coords ? a.d - b.d : 0;              // rest by distance
+  });
   $('hub-list').innerHTML = rows.map(({ poi, d }, i) => {
     const meta = KIND[poi.kind] || KIND.church;
     const rt = d != null

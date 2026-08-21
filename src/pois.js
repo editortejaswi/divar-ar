@@ -24,7 +24,7 @@ export const FESTIVAL = {
 export const POIS = [
   {
     id: 'main-event',
-    name: 'Bonderam Main Event',
+    name: 'Bonderam 2026',
     alt: 'Divar Center \u2014 flag march & float parade',
     layer: 'festival',
     kind: 'event',
