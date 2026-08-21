@@ -141,7 +141,8 @@ function renderHubMap() {
     const [x, y] = hubProj(poi.lat, poi.lon);
     const ic = (KIND[poi.kind] || KIND.church).icon;
     const short = poi.name.replace('Church of ', '').split(' ').slice(0, 2).join(' ');
-    return `<button class="mk ${y < 20 ? 'up' : ''}" data-go="${poi.id}" style="left:${x}%;top:${y}%">
+    const z = poi.id === 'main-event' ? 6 : poi.id === 'piedade-church' ? 1 : 3; // Bonderam foreground, church behind
+    return `<button class="mk ${y < 20 ? 'up' : ''}" data-go="${poi.id}" style="left:${x}%;top:${y}%;z-index:${z}">
       <span class="dot" style="--c:${FEST_CSS[i % FEST_CSS.length]}">${ic}</span><span class="lbl">${short}</span></button>`;
   }).join('');
   $('hub-map').innerHTML = `<div class="grid"></div><div class="sweep"></div>${mks}<div class="me" id="me-dot" style="display:none"></div>`;
