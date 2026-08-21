@@ -3,6 +3,7 @@ import { App } from 'locar';
 import { POIS, FESTIVAL, DEMO_ORIGIN } from './pois.js';
 import { makeLabelSprite, KIND } from './labels.js';
 import { haversine, bearing, compass16, fmtDist } from './geo.js';
+import logoUrl from '../qr/bonderam-logo.webp';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -110,6 +111,11 @@ async function start() {
 
   // (re)play within the gesture chain
   if (v) v.play().then(() => { if (DEBUG) dlog('video.play() ok'); }).catch((e) => camStatus(`Camera acquired but couldn\u2019t play (${e.name}). Reload, and close other apps using the camera.`));
+
+  // pre-warm guidance meshes + shaders so the first "Guide me" doesn't hitch in Safari
+  ensureArrow();
+  ensurePath();
+  try { app.renderer.compile(app.scene, app.camera); } catch (e) {}
 
   locar.on('gpserror', (err) => banner(`GPS error (${err.code}). Move outdoors for a clear sky view.`));
   locar.on('gpsupdate', (ev) => {
@@ -279,9 +285,10 @@ function ensureArrow() {
 }
 
 // ---- ground chevron trail (Maps Live-View style path) ----
-const PATH_N = 10, PATH_SPACING = 6, PATH_START = 4, PATH_SPEED = 2.6;
+const PATH_N = 6, PATH_SPACING = 3.5, PATH_START = 2, PATH_SPEED = 2.0;
 // Bonderam festive palette, cycled along the path so it flows as a rainbow.
 const PATH_COLORS = [0xffd23f, 0x2fd47a, 0xff2fd0, 0x9a7bff, 0xff77c2, 0x38b6ff, 0xff8a3d];
+const PATH_COLOR_OBJS = PATH_COLORS.map((h) => new THREE.Color(h));
 function chevronGeom() {
   const g = new THREE.BufferGeometry();
   // flat triangle in the XZ plane, tip toward +Z (three's lookAt aims +Z at target)
@@ -339,7 +346,7 @@ function tickGuide() {
   const m = markers.find((x) => x.poi.id === guideId);
   if (!m) { arrow.visible = false; for (const c of chevrons) c.visible = false; return; }
   const cam = app.camera;
-  const groundY = cam.position.y - 1.6;
+  const groundY = cam.position.y - 1.7;
 
   // path direction: camera -> destination, horizontal
   const pdir = new THREE.Vector3().subVectors(m.sprite.position, cam.position);
@@ -359,11 +366,11 @@ function tickGuide() {
   arrow.lookAt(at);
   arrow.visible = true;
 
-  // ground chevrons flowing toward the destination (festive palette scrolls forward)
+  // ground chevrons on the floor, flowing toward the destination
   const flow = (performance.now() / 1000 * PATH_SPEED) % PATH_SPACING;
-  const off = Math.floor(performance.now() / 1000 * PATH_SPEED / PATH_SPACING);
   const maxD = Math.min(targetDist - 1.5, PATH_START + PATH_N * PATH_SPACING);
-  const L = PATH_COLORS.length;
+  const L = PATH_COLOR_OBJS.length;
+  const t = performance.now() / 1000;
   for (let i = 0; i < chevrons.length; i++) {
     const c = chevrons[i];
     const d = PATH_START + flow + i * PATH_SPACING;
@@ -371,7 +378,10 @@ function tickGuide() {
     c.position.copy(cam.position).addScaledVector(pdir, d);
     c.position.y = groundY;
     c.lookAt(c.position.x + pdir.x, groundY, c.position.z + pdir.z);
-    c.material.color.setHex(PATH_COLORS[((i - off) % L + L) % L]);
+    // smooth festive colour by world-position + time (seamless across the treadmill recycle)
+    const ph = ((d / 5 - t * 0.5) % L + L) % L;
+    const a = Math.floor(ph), b = (a + 1) % L;
+    c.material.color.copy(PATH_COLOR_OBJS[a]).lerp(PATH_COLOR_OBJS[b], ph - a);
     const fadeIn = Math.min(1, (d - PATH_START) / 3);
     const fadeOut = Math.min(1, (maxD - d) / 4);
     c.material.opacity = 0.92 * Math.max(0, Math.min(fadeIn, fadeOut));
@@ -545,7 +555,7 @@ function banner(msg) {
 
 // ---- wire UI ----
 $('btn-start').addEventListener('click', start);
-$('btn-demo').addEventListener('click', () => { DEMO ? start() : (location.search = '?demo=1'); });
+if ($('start-logo')) $('start-logo').src = logoUrl;
 $('btn-sites').addEventListener('click', renderSites);
 $('btn-capture').addEventListener('click', renderCapture);
 $('sheet-close').addEventListener('click', closeSheet);
