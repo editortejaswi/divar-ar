@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // Per-kind icon glyph + accent colour.
 export const KIND = {
-  event:    { icon: '\u{1F6A9}', color: '#ff6b6b' }, // 🚩 Bonderam main event
+  event:    { icon: '\u{1F3AA}', color: '#ff6b6b' }, // 🎪 Bonderam main event (festival tent)
   church:   { icon: '\u26EA', color: '#ffd27f' }, // ⛪ warm gold
   temple:   { icon: '\u{1F6D5}', color: '#ff9e7f' }, // 🛕 terracotta
   ferry:    { icon: '\u26F4\uFE0F', color: '#7fd4ff' }, // ⛴ river blue

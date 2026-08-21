@@ -119,7 +119,7 @@ export const POIS = [
     verified: false, // pin is the Ribandar (mainland) jetty; need the Divar-side ramp
     blurb:
       'Southwestern ferry to Ribandar on the Panjim\u2013Old Goa causeway \u2014 ' +
-      'one of the three free flat-ferries that are the island\u2019s only access.',
+      'one of the three flat-ferries that are the island\u2019s only access; carry small change.',
   },
   {
     id: 'naroa-ferry',
@@ -133,7 +133,7 @@ export const POIS = [
     elev: 3,
     verified: true,
     blurb:
-      'Free flat-ferry linking Divar\u2019s east end to Narve in Bicholim ' +
+      'Flat-ferry linking Divar\u2019s east end to Narve in Bicholim ' +
       'taluka. Naroa was a sacred confluence of three Mandovi branches, said ' +
       'once to hold 108 temples (Koti Tirth Tali).',
   },
