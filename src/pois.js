@@ -80,10 +80,10 @@ export const POIS = [
     layer: 'heritage',
     kind: 'temple',
     year: '12th\u201314th c.',
-    lat: 15.5561,
-    lon: 73.9432,
+    lat: 15.5312461,
+    lon: 73.9262847,
     elev: 4,
-    verified: false,
+    verified: true,
     blurb:
       'Original site of the Saptakoteshwar temple, holiest shrine of the ' +
       'Kadamba dynasty, established at Naroa per the Sahyadrikhanda. Razed ' +
@@ -98,10 +98,10 @@ export const POIS = [
     layer: 'heritage',
     kind: 'ferry',
     year: 'arrival',
-    lat: 15.5232,
-    lon: 73.9131,
+    lat: 15.5090557,
+    lon: 73.912458,
     elev: 3,
-    verified: false,
+    verified: true,
     blurb:
       'Southern ferry crossing to Old Goa, landing near the Viceroy\u2019s ' +
       'Arch. Runs roughly 7am\u20138pm and is the usual gateway onto the island.',
@@ -113,10 +113,10 @@ export const POIS = [
     layer: 'heritage',
     kind: 'ferry',
     year: 'arrival',
-    lat: 15.5250,
-    lon: 73.9060,
+    lat: 15.5051499,
+    lon: 73.8786674,
     elev: 3,
-    verified: false,
+    verified: true,
     blurb:
       'Southwestern ferry to Ribandar on the Panjim\u2013Old Goa causeway \u2014 ' +
       'one of the three free flat-ferries that are the island\u2019s only access.',
@@ -128,10 +128,10 @@ export const POIS = [
     layer: 'heritage',
     kind: 'ferry',
     year: 'arrival',
-    lat: 15.5573,
-    lon: 73.9451,
+    lat: 15.5391314,
+    lon: 73.9229133,
     elev: 3,
-    verified: false,
+    verified: true,
     blurb:
       'Free flat-ferry linking Divar\u2019s east end to Narve in Bicholim ' +
       'taluka. Naroa was a sacred confluence of three Mandovi branches, said ' +
