@@ -18,7 +18,7 @@ export const FESTIVAL = {
   startsAt: '2026-08-22T15:00:00+05:30',
   floatAt: '2026-08-22T16:00:00+05:30',
   endsAt: '2026-08-22T21:00:00+05:30',
-  mainEvent: { id: 'main-event', lat: 15.5448, lon: 73.9110 },
+  mainEvent: { id: 'main-event', lat: 15.5260, lon: 73.9008 }, // APPROX (near church) - keep in sync with POI below; capture on-site
 };
 
 export const POIS = [
@@ -29,8 +29,8 @@ export const POIS = [
     layer: 'festival',
     kind: 'event',
     year: 'Sat 22 Aug',
-    lat: 15.5448,
-    lon: 73.9110,
+    lat: 15.5260,
+    lon: 73.9008,
     elev: 5,
     verified: false,
     blurb:
@@ -47,8 +47,8 @@ export const POIS = [
     layer: 'heritage',
     kind: 'church',
     year: '1599',
-    lat: 15.545444,
-    lon: 73.912306,
+    lat: 15.525454,
+    lon: 73.899942,
     elev: 4,
     verified: true,
     blurb:
@@ -143,4 +143,4 @@ export const POIS = [
 export const DIVAR_CENTER = { lat: 15.5455, lon: 73.9220 };
 
 // Demo origin for `?demo=1` (fake GPS) — Piedade, just south of the main event.
-export const DEMO_ORIGIN = { lat: 15.5440, lon: 73.9118 };
+export const DEMO_ORIGIN = { lat: 15.5250, lon: 73.8996 };

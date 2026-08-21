@@ -10,95 +10,100 @@
   <link href="https://fonts.googleapis.com/css2?family=Caprasimo&family=Figtree:wght@400;600;700;800&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #0b0e14;
-      --panel: rgba(16, 19, 27, 0.86);
-      --stroke: rgba(255, 255, 255, 0.12);
-      --gold: #ffd27f;
-      --go: #2fd47a;
-      --text: #f2f4f8;
-      --muted: #9aa3b2;
-      --safe-t: env(safe-area-inset-top, 0px);
-      --safe-b: env(safe-area-inset-bottom, 0px);
+      --bg: #0b0e14; --panel: rgba(18, 22, 33, 0.9); --panel2: rgba(28, 34, 50, 0.75);
+      --stroke: rgba(255, 255, 255, 0.12); --gold: #ffd27f; --go: #2fd47a;
+      --text: #f2f4f8; --muted: #9aa3b2;
+      --safe-t: env(safe-area-inset-top, 0px); --safe-b: env(safe-area-inset-bottom, 0px);
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    html, body { margin: 0; height: 100%; overflow: hidden;
-      color: var(--text); font-family: 'Figtree', system-ui, -apple-system, sans-serif; }
+    html, body { margin: 0; height: 100%; overflow: hidden; color: var(--text);
+      font-family: 'Figtree', system-ui, -apple-system, sans-serif; }
     html { background: var(--bg); }
-    /* body MUST be transparent: LocAR appends the camera <video> at z-index:-100 on
-       <body>, and an opaque body background paints over it -> black screen. */
-    body { background: transparent; }
+    body { background: transparent; }   /* let LocAR's z-index:-100 camera video show */
     #glscene { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; background: transparent; }
+    .muted { color: var(--muted); }
 
-    /* ---- start screen: festive "Paradise Island" ---- */
-    #start { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; text-align: center; padding: 26px 24px;
-      gap: 8px; overflow: hidden;
+    /* ===== Enter / onboarding ===== */
+    #start { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center; padding: 26px 24px; gap: 8px; overflow: hidden;
       background: radial-gradient(135% 100% at 50% -8%, #3a2170 0%, #17284c 46%, #0b0e14 100%); }
     #start .bunting { display: flex; gap: 7px; margin-bottom: 8px; }
-    #start .bunting span { width: 26px; height: 30px; clip-path: polygon(0 0, 100% 0, 50% 100%);
-      box-shadow: 0 3px 6px rgba(0,0,0,0.25); }
-    #start-logo { width: min(60vw, 220px); height: auto; border-radius: 18px;
-      box-shadow: 0 14px 40px rgba(0,0,0,0.5); }
-    #start .kicker { letter-spacing: 3px; font-weight: 800; font-size: 12.5px; color: var(--gold);
-      text-transform: uppercase; margin-top: 14px; }
-    #start h1 { font-family: 'Caprasimo', system-ui, serif; font-weight: 400; font-size: 44px;
-      line-height: 1.0; margin: 3px 0 0;
-      background: linear-gradient(92deg, #ffd23f, #ff77c2, #9a7bff, #38b6ff);
-      -webkit-background-clip: text; background-clip: text; color: transparent; }
+    #start .bunting span { width: 26px; height: 30px; clip-path: polygon(0 0, 100% 0, 50% 100%); box-shadow: 0 3px 6px rgba(0,0,0,0.25); }
+    #start-logo { width: min(58vw, 210px); height: auto; border-radius: 18px; box-shadow: 0 14px 40px rgba(0,0,0,0.5); }
+    #start .kicker { letter-spacing: 3px; font-weight: 800; font-size: 12.5px; color: var(--gold); text-transform: uppercase; margin-top: 14px; }
+    #start h1 { font-family: 'Caprasimo', system-ui, serif; font-weight: 400; font-size: 44px; line-height: 1.0; margin: 3px 0 0;
+      background: linear-gradient(92deg, #ffd23f, #ff77c2, #9a7bff, #38b6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
     #start .sub { color: #c9d1df; max-width: 330px; line-height: 1.55; margin: 12px 0 2px; font-size: 14px; }
     #start .note { color: var(--muted); font-size: 12px; max-width: 320px; line-height: 1.5; margin-top: 14px; }
-    .btn { appearance: none; border: 1px solid var(--stroke); border-radius: 14px;
-      background: var(--panel); color: var(--text); font-size: 16px; font-weight: 600;
-      padding: 14px 22px; cursor: pointer; backdrop-filter: blur(8px); }
+    .btn { appearance: none; border: 1px solid var(--stroke); border-radius: 14px; background: var(--panel2); color: var(--text);
+      font-size: 16px; font-weight: 600; padding: 14px 22px; cursor: pointer; backdrop-filter: blur(8px); }
+    .btn:active { transform: scale(0.97); }
     .btn.go { background: var(--go); color: #04240f; border-color: transparent; }
     .btn.wide { width: 100%; margin-top: 12px; }
-    .btn:active { transform: scale(0.97); }
-    .btn.enter { margin-top: 20px; border: none; color: #2a0f00; font-weight: 700; font-size: 18px;
-      letter-spacing: 0.3px; padding: 16px 30px; border-radius: 16px;
-      background: linear-gradient(92deg, #ffd23f, #ff8a3d, #ff5cc8);
-      box-shadow: 0 14px 34px rgba(255, 92, 150, 0.38); }
+    .btn.enter { margin-top: 20px; border: none; color: #2a0f00; font-weight: 700; font-size: 18px; letter-spacing: 0.3px;
+      padding: 16px 30px; border-radius: 16px; background: linear-gradient(92deg, #ffd23f, #ff8a3d, #ff5cc8); box-shadow: 0 14px 34px rgba(255, 92, 150, 0.38); }
 
-    /* ---- HUD ---- */
-    #hud { position: fixed; top: calc(var(--safe-t) + 10px); left: 10px; right: 10px;
-      z-index: 20; display: none; justify-content: space-between; align-items: center;
-      gap: 8px; padding: 10px 14px; border-radius: 14px; background: var(--panel);
-      border: 1px solid var(--stroke); backdrop-filter: blur(10px); font-size: 13px; }
-    #hud .near { font-weight: 600; }
-    #hud .acc { color: var(--muted); white-space: nowrap; }
-    #hud .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
-      background: #ff5c5c; margin-right: 6px; vertical-align: middle; }
-    #hud .dot.ok { background: #57e08a; }
+    /* ===== HUB (map-first landing) ===== */
+    #hub { position: fixed; inset: 0; z-index: 30; display: none; flex-direction: column; overflow-y: auto;
+      padding: calc(var(--safe-t) + 14px) 14px calc(var(--safe-b) + 18px);
+      background: radial-gradient(120% 70% at 50% -6%, #241645 0%, #101a30 42%, #0b0e14 100%); gap: 12px; }
+    #hub-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    #hub-head .brand { font-family: 'Caprasimo', serif; font-size: 26px;
+      background: linear-gradient(92deg, #ffd23f, #ff77c2, #38b6ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    #hub-fest { font-size: 12px; font-weight: 700; color: var(--gold); text-align: right; line-height: 1.3; max-width: 58%; }
+    .seg { display: flex; background: rgba(0,0,0,0.35); border: 1px solid var(--stroke); border-radius: 999px; padding: 4px; gap: 4px; align-self: center; }
+    .seg button { appearance: none; border: none; background: none; color: var(--muted); font-weight: 700; font-size: 14px;
+      padding: 8px 20px; border-radius: 999px; cursor: pointer; }
+    .seg button.on { background: linear-gradient(92deg, #ffd23f, #ff8a3d); color: #2a0f00; }
+    .listhead { font-weight: 800; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 4px 2px -2px; }
+    #hub-list { display: flex; flex-direction: column; gap: 8px; }
+    .pcard { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px;
+      background: var(--panel); border: 1px solid var(--stroke); cursor: pointer; }
+    .pcard:active { transform: scale(0.99); }
+    .pcard .ic { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      font-size: 20px; background: var(--c, #333); box-shadow: 0 0 14px -2px var(--c, #333); flex: none; }
+    .pcard .txt { min-width: 0; flex: 1; }
+    .pcard .nm { font-weight: 700; font-size: 15px; }
+    .pcard .wh { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pcard .rt { text-align: right; flex: none; }
+    .pcard .rt .d { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .pcard .rt .e { color: var(--go); font-size: 12px; font-weight: 700; }
+    .hub-actions { display: flex; gap: 10px; margin-top: 4px; }
+    .ghost { flex: 1; appearance: none; background: rgba(255,255,255,0.05); border: 1px solid var(--stroke); color: var(--text);
+      border-radius: 14px; padding: 13px; font-size: 13.5px; font-weight: 700; cursor: pointer; }
 
-    /* ---- adaptive Bonderam banner ---- */
-    #smart { position: fixed; top: calc(var(--safe-t) + 58px); left: 10px; right: 10px;
-      z-index: 20; display: none; padding: 9px 14px; border-radius: 12px; background: var(--panel);
-      border: 1px solid var(--stroke); border-left: 4px solid var(--gold); backdrop-filter: blur(10px);
-      font-size: 12.5px; line-height: 1.35; cursor: pointer; }
-    #smart b { font-weight: 700; }
-    #smart[data-phase="soon"] { border-left-color: #ff9e3d; }
-    #smart[data-phase="live"] { border-left-color: #57e08a; }
-    #smart[data-phase="after"] { border-left-color: var(--stroke); }
+    /* ===== map ===== */
+    .tmap { position: relative; width: 100%; height: 40vh; min-height: 260px; border-radius: 18px; overflow: hidden;
+      border: 1px solid var(--stroke); background: radial-gradient(120% 120% at 50% 42%, #14243f 0%, #0a0e18 72%); }
+    .tmap .grid { position: absolute; inset: 0; background-image: linear-gradient(rgba(120,180,255,0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(120,180,255,0.09) 1px, transparent 1px); background-size: 30px 30px; }
+    .tmap .sweep { position: absolute; left: 50%; top: 50%; width: 200%; height: 200%; transform: translate(-50%, -50%); pointer-events: none;
+      background: conic-gradient(from 0deg, rgba(47,212,122,0.16), rgba(47,212,122,0) 28%); animation: sweep 6s linear infinite; }
+    @keyframes sweep { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    .mk { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px;
+      background: none; border: none; cursor: pointer; padding: 0; z-index: 2; }
+    .mk.up { flex-direction: column-reverse; }
+    .mk .dot { width: 26px; height: 26px; border-radius: 50%; background: var(--c); display: flex; align-items: center; justify-content: center;
+      font-size: 14px; box-shadow: 0 0 14px var(--c), inset 0 0 0 2px rgba(255,255,255,0.55); }
+    .mk .lbl { font-size: 10px; font-weight: 700; color: #eef2ff; white-space: nowrap; background: rgba(6,10,20,0.55); padding: 1px 5px; border-radius: 6px; }
+    .me { position: absolute; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%; background: #38b6ff; border: 2px solid #fff; z-index: 3;
+      box-shadow: 0 0 0 0 rgba(56,182,255,0.55); animation: mepulse 1.8s ease-out infinite; }
+    @keyframes mepulse { 0% { box-shadow: 0 0 0 0 rgba(56,182,255,0.55); } 100% { box-shadow: 0 0 0 20px rgba(56,182,255,0); } }
 
-    /* ---- active guidance bar ---- */
-    #guide { position: fixed; left: 10px; right: 10px; bottom: calc(var(--safe-b) + 74px);
-      z-index: 25; display: none; align-items: center; gap: 10px; padding: 11px 12px 11px 15px;
-      border-radius: 14px; background: var(--panel); border: 1px solid var(--stroke);
-      border-left: 4px solid var(--go); backdrop-filter: blur(10px); font-size: 13.5px; font-weight: 600; }
-    #guide #guide-txt { flex: 1; }
-    #guide #guide-stop { appearance: none; border: none; background: rgba(255,255,255,0.12);
-      color: var(--text); width: 30px; height: 30px; border-radius: 50%; font-size: 15px; cursor: pointer; flex: none; }
+    /* ===== AR guidance top bar ===== */
+    #arbar { position: fixed; top: calc(var(--safe-t) + 10px); left: 10px; right: 10px; z-index: 25; display: none;
+      align-items: center; gap: 10px; padding: 8px 8px 8px 6px; border-radius: 16px; background: var(--panel);
+      border: 1px solid var(--stroke); border-left: 4px solid var(--go); backdrop-filter: blur(10px); }
+    #arbar .ic-btn { appearance: none; border: none; background: rgba(255,255,255,0.1); color: var(--text); width: 38px; height: 38px;
+      border-radius: 11px; font-size: 20px; cursor: pointer; flex: none; }
+    #arbar .dest { flex: 1; min-width: 0; }
+    #arbar .dest .n { font-weight: 700; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #arbar .dest .e { color: var(--muted); font-size: 12px; }
 
-    /* ---- toolbar ---- */
-    #toolbar { position: fixed; bottom: calc(var(--safe-b) + 14px); left: 0; right: 0;
-      z-index: 20; display: none; justify-content: center; gap: 10px; }
-    #toolbar .btn { padding: 12px 18px; font-size: 15px; }
-
-    /* ---- bottom sheet ---- */
-    #sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; transform: translateY(110%);
-      transition: transform 0.28s ease; max-height: 80vh; display: flex; flex-direction: column;
-      background: var(--panel); border-top-left-radius: 20px; border-top-right-radius: 20px;
-      border: 1px solid var(--stroke); backdrop-filter: blur(14px);
-      padding: 10px 18px calc(var(--safe-b) + 18px); }
+    /* ===== bottom sheet (detail / capture) ===== */
+    #sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 45; transform: translateY(110%); transition: transform 0.28s ease;
+      max-height: 82vh; display: flex; flex-direction: column; background: var(--panel); border-top-left-radius: 22px; border-top-right-radius: 22px;
+      border: 1px solid var(--stroke); backdrop-filter: blur(14px); padding: 10px 18px calc(var(--safe-b) + 18px); }
     #sheet.open { transform: translateY(0); }
     #sheet .grip { width: 42px; height: 5px; border-radius: 3px; background: var(--stroke); margin: 6px auto 10px; }
     #sheet .body { overflow-y: auto; }
@@ -108,83 +113,50 @@
     .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--stroke); color: var(--muted); }
     .chip.strong { color: var(--text); }
     #sheet p.desc { line-height: 1.55; font-size: 15px; margin: 0 0 6px; }
-    .sheet-close { position: absolute; top: 12px; right: 14px; font-size: 22px; color: var(--muted);
-      background: none; border: none; cursor: pointer; }
-
-    /* sites list */
-    .site { display: flex; align-items: center; gap: 10px; padding: 11px 4px; border-bottom: 1px solid var(--stroke); }
-    .site:last-child { border-bottom: none; }
-    .site .ic { font-size: 25px; width: 32px; text-align: center; }
-    .site .main { min-width: 0; cursor: pointer; }
-    .site .name { font-weight: 600; font-size: 15px; }
-    .site .where { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .site .dist { margin-left: auto; text-align: right; font-variant-numeric: tabular-nums; }
-    .site .dist .d { font-weight: 700; }
-    .site .dist .b { color: var(--muted); font-size: 12px; }
-    .site .row-guide { flex: none; appearance: none; border: none; background: rgba(47,212,122,0.16);
-      color: var(--go); font-weight: 800; width: 42px; height: 42px; border-radius: 12px; font-size: 17px; cursor: pointer; }
-    .site .row-guide:active { transform: scale(0.94); }
-
-    /* travel map */
-    .tmap { position: relative; width: 100%; height: min(56vh, 430px); margin-top: 8px;
-      border-radius: 16px; overflow: hidden; border: 1px solid var(--stroke);
-      background: radial-gradient(120% 120% at 50% 42%, #14243f 0%, #0a0e18 72%); }
-    .tmap .grid { position: absolute; inset: 0;
-      background-image: linear-gradient(rgba(120,180,255,0.09) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(120,180,255,0.09) 1px, transparent 1px);
-      background-size: 30px 30px; }
-    .tmap .sweep { position: absolute; left: 50%; top: 50%; width: 200%; height: 200%;
-      transform: translate(-50%, -50%); pointer-events: none;
-      background: conic-gradient(from 0deg, rgba(47,212,122,0.16), rgba(47,212,122,0) 28%);
-      animation: sweep 6s linear infinite; }
-    @keyframes sweep { to { transform: translate(-50%, -50%) rotate(360deg); } }
-    .mk { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column;
-      align-items: center; gap: 2px; background: none; border: none; cursor: pointer; padding: 0; z-index: 2; }
-    .mk.up { flex-direction: column-reverse; }
-    .mk .dot { width: 24px; height: 24px; border-radius: 50%; background: var(--c);
-      display: flex; align-items: center; justify-content: center; font-size: 13px;
-      box-shadow: 0 0 14px var(--c), inset 0 0 0 2px rgba(255,255,255,0.55); }
-    .mk .lbl { font-size: 10px; font-weight: 700; color: #eef2ff; white-space: nowrap;
-      background: rgba(6,10,20,0.55); padding: 1px 5px; border-radius: 6px; }
-    .me { position: absolute; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%;
-      background: #38b6ff; border: 2px solid #fff; z-index: 3;
-      box-shadow: 0 0 0 0 rgba(56,182,255,0.55); animation: mepulse 1.8s ease-out infinite; }
-    @keyframes mepulse { 0% { box-shadow: 0 0 0 0 rgba(56,182,255,0.55); } 100% { box-shadow: 0 0 0 20px rgba(56,182,255,0); } }
-
-    /* capture tool */
-    .cap-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
-      border-bottom: 1px solid var(--stroke); font-variant-numeric: tabular-nums; font-size: 13.5px; }
+    .sheet-close { position: absolute; top: 12px; right: 14px; font-size: 22px; color: var(--muted); background: none; border: none; cursor: pointer; }
+    .cap-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid var(--stroke); font-variant-numeric: tabular-nums; font-size: 13.5px; }
     .cap-row .n { color: var(--muted); width: 20px; }
     .cap-empty { color: var(--muted); font-size: 14px; padding: 14px 4px; line-height: 1.5; }
-    .cap-actions { display: flex; gap: 10px; margin-top: 12px; }
+    .cap-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
   <canvas id="glscene"></canvas>
 
-  <div id="hud">
-    <span class="near" id="hud-near">Locating&hellip;</span>
-    <span class="acc"><span class="dot" id="hud-dot"></span><span id="hud-acc">GPS &ndash;</span></span>
+  <!-- AR guidance top bar -->
+  <div id="arbar">
+    <button class="ic-btn" id="ar-back" title="Back to map">&lsaquo;</button>
+    <div class="dest"><div class="n" id="ar-name">Exploring Divar</div><div class="e" id="ar-eta"></div></div>
+    <button class="ic-btn" id="ar-stop" title="Stop">&times;</button>
   </div>
 
-  <div id="smart"></div>
-
-  <div id="guide">
-    <span id="guide-txt">&#10148;</span>
-    <button id="guide-stop" title="Stop guiding">&times;</button>
-  </div>
-
-  <div id="toolbar">
-    <button class="btn" id="btn-sites">&#128506;&#65039; Travel</button>
-    <button class="btn" id="btn-capture">&#128205; Capture</button>
-  </div>
-
+  <!-- detail / capture sheet -->
   <div id="sheet">
     <div class="grip"></div>
     <button class="sheet-close" id="sheet-close">&times;</button>
     <div class="body" id="sheet-body"></div>
   </div>
 
+  <!-- HUB: map-first landing -->
+  <div id="hub">
+    <div id="hub-head">
+      <div class="brand">Divar</div>
+      <div id="hub-fest"></div>
+    </div>
+    <div class="seg" id="mode">
+      <button data-mode="walk" class="on">&#128694; Walk</button>
+      <button data-mode="drive">&#128663; Drive</button>
+    </div>
+    <div class="tmap" id="hub-map"><div class="grid"></div><div class="sweep"></div></div>
+    <div class="listhead">Where to?</div>
+    <div id="hub-list"></div>
+    <div class="hub-actions">
+      <button class="ghost" id="hub-explore">&#128065; Look around in AR</button>
+      <button class="ghost" id="hub-capture">&#128205; Add / fix a place</button>
+    </div>
+  </div>
+
+  <!-- Enter / onboarding -->
   <div id="start">
     <div class="bunting">
       <span style="background:#ffd23f"></span><span style="background:#2fd47a"></span>
@@ -197,10 +169,10 @@
     <img id="start-logo" alt="Bonderam 2026 &mdash; Divar Island" />
     <div class="kicker">Welcome to Divar</div>
     <h1>The Paradise Island</h1>
-    <p class="sub">Step through and taste the island life. It's churches, ferries, and the <b>Bonderam</b> festival. Floating around you in augmented reality.</p>
+    <p class="sub">Step through and taste the island life. It's churches, ferries, and the
+      <b>Bonderam</b> festival. Floating around you in augmented reality.</p>
     <button class="btn enter" id="btn-start">&#10024; Enter the Paradise Island</button>
-    <p class="note">Best outdoors with a clear sky. Allow <b>camera</b>, <b>location</b>
-      and <b>motion</b> when asked.</p>
+    <p class="note">Best outdoors with a clear sky. Allow <b>camera</b>, <b>location</b> and <b>motion</b> when asked.</p>
   </div>
 
   <script type="module" src="/src/main.js"></script>
