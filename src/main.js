@@ -22,7 +22,7 @@ let arrow = null;
 const chevrons = [];
 let hubProj = null;
 let capSel = null;        // poi id selected in the capture tool
-let voiceOn = true;       // AR voice guidance on/off
+let voiceOn = false;      // AR voice disabled (logic kept; toggle hidden). Flip true + unhide #ar-voice to re-enable.
 let vCue = '', vAt = 0, vDist = null; // last spoken cue / time / distance
 
 // ---- travel mode + ETA ----
@@ -83,6 +83,7 @@ async function start() {
 
   locar.on('gpserror', (err) => camStatus(`GPS error (${err.code}). Move outdoors for clear sky.`));
   locar.on('gpsupdate', (ev) => { coords = ev.position.coords; if (firstFix) { addPois(); firstFix = false; } refresh(); });
+  await applyOverrides();   // pull live on-site coordinate captures from the repo before first render
 
   setInterval(updateFest, 1000);
   showHub();
@@ -190,7 +191,7 @@ function updateFest() {
   let txt = now >= eT ? 'Bonderam \u2014 till next year'
     : now >= sT ? '\u{1F389} Bonderam is LIVE'
     : `\u{1F6A9} Bonderam in ${fmtCountdown(sT - now)}`;
-  if (coords) { const d = haversine(coords.latitude, coords.longitude, FESTIVAL.mainEvent.lat, FESTIVAL.mainEvent.lon);
+  if (coords) { const me = POI_BY_ID['main-event'] || FESTIVAL.mainEvent; const d = haversine(coords.latitude, coords.longitude, me.lat, me.lon);
     txt += `<br>main event \u00B7 ${fmtDist(d)} \u00B7 ${eta(d)} min ${modeIcon()}`; }
   el.innerHTML = txt;
 }
@@ -378,18 +379,34 @@ function showArrival(poi) {
 function renderCapture() {
   if (!capSel) capSel = POIS[0]?.id;
   const opts = POIS.map((p) => `<option value="${p.id}"${p.id === capSel ? ' selected' : ''}>${p.verified ? '\u2713' : '\u25B3'} ${p.name}</option>`).join('');
+  const last = [...captures].reverse().find((c) => c.id === capSel);
+  const tok = ghToken();
   const list = captures.length
     ? captures.map((c, i) => `<div class="cap-row"><span class="n">${i + 1}</span><span>${c.name}: ${c.lat.toFixed(6)}, ${c.lon.toFixed(6)}</span><span style="margin-left:auto;color:var(--muted)">\u00B1${Math.round(c.acc)} m</span></div>`).join('')
-    : '<p class="cap-empty">Pick the place you\u2019re standing at, wait for accuracy under ~10 m, then Capture. Paste the JSON into <code>src/pois.js</code>.</p>';
+    : '<p class="cap-empty">Pick the place you\u2019re standing at, wait for accuracy under ~10 m, tap Capture, then Publish live.</p>';
   openSheet(`<h2>\u{1F4CD} Add / fix a place</h2>
     <p class="cap-empty" style="margin:0 0 8px">Which place are you standing at?</p>
     <select id="c-poi" style="width:100%;padding:12px;border-radius:12px;background:var(--panel2,#141a26);color:var(--text,#eaf1ff);border:1px solid var(--stroke,#243044);font-size:15px;margin-bottom:10px">${opts}</select>
     <div>${list}</div>
-    <div class="cap-actions"><button class="btn" id="c-read">Capture here</button><button class="btn" id="c-copy">Copy JSON</button><button class="btn" id="c-clear">Clear</button></div>`);
-  $('c-poi').addEventListener('change', (e) => { capSel = e.target.value; });
+    <div class="cap-actions">
+      <button class="btn" id="c-read">\u{1F4E1} Capture here</button>
+      <button class="btn go" id="c-pub"${last ? '' : ' disabled style="opacity:.5"'}>\u2B06 Publish live</button>
+      <button class="btn" id="c-copy">Copy JSON</button>
+    </div>
+    <p class="cap-empty" style="margin-top:10px;font-size:12px;line-height:1.5">
+      ${last ? `Ready: <b>${last.name}</b> \u2192 ${last.lat.toFixed(6)}, ${last.lon.toFixed(6)}. ` : ''}
+      ${tok ? 'Publish sends it straight to the live site (\u2248 1 min). ' : 'Publishing needs a one-time GitHub token \u2014 stored only on this phone. '}
+      <a id="c-tok" style="color:var(--go);text-decoration:underline;cursor:pointer">${tok ? 'change / remove token' : 'set token'}</a>
+    </p>`);
+  $('c-poi').addEventListener('change', (e) => { capSel = e.target.value; renderCapture(); });
   $('c-read').addEventListener('click', captureReading);
+  $('c-pub').addEventListener('click', () => publishOverride(capSel));
   $('c-copy').addEventListener('click', () => navigator.clipboard?.writeText(JSON.stringify(captures.map((c) => ({ id: c.id, lat: +c.lat.toFixed(6), lon: +c.lon.toFixed(6) })), null, 2)).then(() => banner('Copied.'), () => banner('Copy failed.')));
-  $('c-clear').addEventListener('click', () => { captures.length = 0; renderCapture(); });
+  $('c-tok').addEventListener('click', () => {
+    if (ghToken()) { if (confirm('Remove the saved GitHub token from this device?')) { localStorage.removeItem('divar_gh_token'); banner('Token removed.'); } }
+    else promptToken();
+    renderCapture();
+  });
 }
 function captureReading() {
   if (!navigator.geolocation) return banner('No geolocation.');
@@ -399,6 +416,54 @@ function captureReading() {
   navigator.geolocation.getCurrentPosition(
     (p) => { captures.push({ id, name, lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy }); renderCapture(); },
     (e) => banner(`GPS error (${e.code}).`), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+}
+
+// ---- live capture publishing (client -> GitHub; token stays on the operator's device) ----
+const REPO = 'editortejaswi/divar-ar', OVR_PATH = 'public/overrides.json';
+const b64enc = (s) => btoa(unescape(encodeURIComponent(s)));
+const b64dec = (s) => decodeURIComponent(escape(atob(s.replace(/\s/g, ''))));
+const ghToken = () => localStorage.getItem('divar_gh_token') || '';
+function promptToken() {
+  const t = prompt('Paste a GitHub token (fine-grained: Contents \u2192 Read and write on the divar-ar repo). Stored only on this phone.');
+  if (t && t.trim()) { localStorage.setItem('divar_gh_token', t.trim()); return t.trim(); }
+  return '';
+}
+async function applyOverrides() {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), 3000);   // don't let a slow 4G fetch freeze startup
+  try {
+    const r = await fetch(`${import.meta.env.BASE_URL}overrides.json?t=${Date.now()}`, { cache: 'no-store', signal: ac.signal });
+    if (!r.ok) return;
+    const ov = await r.json();
+    for (const [id, o] of Object.entries(ov)) {
+      const poi = POI_BY_ID[id];
+      if (poi && Number.isFinite(o.lat) && Number.isFinite(o.lon)) { poi.lat = o.lat; poi.lon = o.lon; poi.verified = true; }
+    }
+  } catch (e) {} finally { clearTimeout(t); }
+}
+async function publishOverride(poiId) {
+  const c = [...captures].reverse().find((x) => x.id === poiId);
+  if (!c) return banner('Capture a reading here first.');
+  let tok = ghToken(); if (!tok) { tok = promptToken(); if (!tok) return; }
+  banner('Publishing\u2026');
+  const api = `https://api.github.com/repos/${REPO}/contents/${OVR_PATH}`;
+  const headers = { Authorization: `Bearer ${tok}`, Accept: 'application/vnd.github+json' };
+  try {
+    let sha, data = {};
+    const g = await fetch(`${api}?ref=main&t=${Date.now()}`, { headers, cache: 'no-store' });
+    if (g.status === 200) { const j = await g.json(); sha = j.sha; try { data = JSON.parse(b64dec(j.content)); } catch (e) { data = {}; } }
+    else if (g.status === 401 || g.status === 403) return banner('Token rejected or missing Contents write \u2014 tap \u201cchange token\u201d.');
+    else if (g.status !== 404) throw new Error('read ' + g.status);
+    data[poiId] = { lat: +c.lat.toFixed(6), lon: +c.lon.toFixed(6), acc: Math.round(c.acc), ts: Date.now() };
+    const body = { message: `Capture ${poiId} -> ${data[poiId].lat},${data[poiId].lon}`, content: b64enc(JSON.stringify(data, null, 2) + '\n'), branch: 'main' };
+    if (sha) body.sha = sha;
+    const p = await fetch(api, { method: 'PUT', headers, body: JSON.stringify(body) });
+    if (p.status === 401 || p.status === 403) return banner('Token rejected or missing Contents write \u2014 tap \u201cchange token\u201d.');
+    if (!p.ok) throw new Error('write ' + p.status);
+    const poi = POI_BY_ID[poiId]; if (poi) { poi.lat = data[poiId].lat; poi.lon = data[poiId].lon; poi.verified = true; }
+    if ($('hub').style.display !== 'none') { renderHubMap(); renderHubList(); }
+    banner(`Published ${poi ? poi.name : poiId}. Live on the site in \u2248 1 min.`);
+  } catch (e) { banner('Publish failed: ' + e.message); }
 }
 
 let bannerTimer;
@@ -423,16 +488,12 @@ if ($('start-logo')) $('start-logo').src = logoUrl;
 $('btn-start').addEventListener('click', start);
 $('ar-back').addEventListener('click', showHub);
 $('ar-stop').addEventListener('click', showHub);
-$('ar-voice').addEventListener('click', () => {
-  voiceOn = !voiceOn;
-  $('ar-voice').innerHTML = voiceOn ? '&#128266;' : '&#128263;';
-  if (!voiceOn) { if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} } }
-  else speak('Voice guidance on.');
-});
+if ($('ar-voice')) $('ar-voice').style.display = 'none';   // voice disabled: keep logic, hide the toggle
 $('ar-name').addEventListener('click', () => { if (guideId) showDetail(POI_BY_ID[guideId]); });
 $('sheet-close').addEventListener('click', closeSheet);
 $('hub-explore').addEventListener('click', openExplore);
 $('hub-capture').addEventListener('click', renderCapture);
+if (!params.has('admin')) $('hub-capture').style.display = 'none';   // operator-only: open ?admin=1
 $('mode').querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
   mode = b.dataset.mode;
   $('mode').querySelectorAll('[data-mode]').forEach((x) => x.classList.toggle('on', x === b));
