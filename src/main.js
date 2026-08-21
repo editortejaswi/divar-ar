@@ -243,7 +243,7 @@ function ensureArrow() {
   head.rotation.x = Math.PI / 2;
   head.position.z = 0.78;
   arrow.add(shaft, head);
-  arrow.scale.setScalar(0.5);
+  arrow.scale.setScalar(1.0);
   arrow.renderOrder = 20;
   arrow.visible = false;
   app.scene.add(arrow);
@@ -252,6 +252,8 @@ function ensureArrow() {
 
 // ---- ground chevron trail (Maps Live-View style path) ----
 const PATH_N = 10, PATH_SPACING = 4, PATH_START = 3, PATH_SPEED = 2.2;
+// Bonderam festive palette, cycled along the path so it flows as a rainbow.
+const PATH_COLORS = [0xffd23f, 0x2fd47a, 0xff2fd0, 0x9a7bff, 0xff77c2, 0x38b6ff, 0xff8a3d];
 function chevronGeom() {
   const g = new THREE.BufferGeometry();
   // flat triangle in the XZ plane, tip toward +Z (three's lookAt aims +Z at target)
@@ -266,10 +268,11 @@ function ensurePath() {
   const geo = chevronGeom();
   for (let i = 0; i < PATH_N; i++) {
     const mat = new THREE.MeshBasicMaterial({
-      color: 0x39e0a0, transparent: true, opacity: 0.9,
+      color: PATH_COLORS[i % PATH_COLORS.length], transparent: true, opacity: 0.92,
       side: THREE.DoubleSide, depthWrite: false, depthTest: false,
     });
     const mesh = new THREE.Mesh(geo, mat);
+    mesh.scale.setScalar(2);
     mesh.renderOrder = 15;
     mesh.visible = false;
     app.scene.add(mesh);
@@ -322,9 +325,11 @@ function tickGuide() {
   arrow.lookAt(at);
   arrow.visible = true;
 
-  // ground chevrons flowing toward the destination
+  // ground chevrons flowing toward the destination (festive palette scrolls forward)
   const flow = (performance.now() / 1000 * PATH_SPEED) % PATH_SPACING;
+  const off = Math.floor(performance.now() / 1000 * PATH_SPEED / PATH_SPACING);
   const maxD = Math.min(targetDist - 1.5, PATH_START + PATH_N * PATH_SPACING);
+  const L = PATH_COLORS.length;
   for (let i = 0; i < chevrons.length; i++) {
     const c = chevrons[i];
     const d = PATH_START + flow + i * PATH_SPACING;
@@ -332,9 +337,10 @@ function tickGuide() {
     c.position.copy(cam.position).addScaledVector(pdir, d);
     c.position.y = groundY;
     c.lookAt(c.position.x + pdir.x, groundY, c.position.z + pdir.z);
+    c.material.color.setHex(PATH_COLORS[((i - off) % L + L) % L]);
     const fadeIn = Math.min(1, (d - PATH_START) / 3);
     const fadeOut = Math.min(1, (maxD - d) / 4);
-    c.material.opacity = 0.9 * Math.max(0, Math.min(fadeIn, fadeOut));
+    c.material.opacity = 0.92 * Math.max(0, Math.min(fadeIn, fadeOut));
     c.visible = c.material.opacity > 0.02;
   }
 }
