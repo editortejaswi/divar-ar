@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b0e14" />
+  <title>Opening Divar AR&hellip;</title>
+  <!-- Cloudflare Web Analytics: this /s/ path = QR scans (kept separate from direct visits to /divar-ar/) -->
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token": "ea8620fbb23e465a8a254c4fa4610f1f"}'></script>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b0e14; color: #f2f4f8;
+      font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; }
+    .s { text-align: center; opacity: 0.9; }
+    .dot { display: inline-block; width: 30px; height: 30px; border-radius: 50%; border: 3px solid #2fd47a;
+      border-top-color: transparent; animation: sp 0.8s linear infinite; margin-bottom: 12px; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="s"><div class="dot"></div><div>Opening Divar AR&hellip;</div></div>
+  <script>
+    // Let the analytics beacon fire on this path, then hand off to the app.
+    setTimeout(function () { location.replace('/divar-ar/'); }, 700);
+  </script>
+</body>
+</html>
