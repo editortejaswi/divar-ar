@@ -5,7 +5,7 @@ import { makeLabelSprite, KIND } from './labels.js';
 import { haversine, bearing, compass16, fmtDist } from './geo.js';
 import logoUrl from '../qr/bonderam-logo.webp';
 import { relAngle, cueFor } from './guide-math.js';
-import mapUrl from './divar-map.png';
+import mapUrl from './divar-map.webp';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
