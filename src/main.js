@@ -425,6 +425,64 @@ function renderDetail(poi) {
   $('detail-guide').addEventListener('click', () => startGuide(poi));
 }
 
+// ---- festive travel map (visual place picker) ----
+const FEST_CSS = ['#ffd23f', '#2fd47a', '#ff2fd0', '#9a7bff', '#ff77c2', '#38b6ff', '#ff8a3d'];
+function projector(pts) {
+  const lats = pts.map((p) => p.lat), lons = pts.map((p) => p.lon);
+  const meanLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const k = Math.cos((meanLat * Math.PI) / 180) || 1;
+  const xs = lons.map((l) => l * k);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...lats), maxY = Math.max(...lats);
+  const spanX = (maxX - minX) || 1e-6, spanY = (maxY - minY) || 1e-6;
+  const pad = 15;
+  const scale = Math.min((100 - 2 * pad) / spanX, (100 - 2 * pad) / spanY);
+  const ox = (100 - spanX * scale) / 2, oy = (100 - spanY * scale) / 2;
+  return (lat, lon) => [ox + (lon * k - minX) * scale, oy + (maxY - lat) * scale];
+}
+function renderMap() {
+  const pts = POIS.slice();
+  if (coords) pts.push({ lat: coords.latitude, lon: coords.longitude });
+  const proj = projector(pts);
+  const markers = POIS.map((poi, i) => {
+    const [x, y] = proj(poi.lat, poi.lon);
+    const ic = (KIND[poi.kind] || KIND.church).icon;
+    const short = poi.name.replace('Church of ', '').split(' ').slice(0, 2).join(' ');
+    return `<button class="mk ${y < 22 ? 'up' : ''}" data-open="${poi.id}" style="left:${x}%;top:${y}%">
+      <span class="dot" style="--c:${FEST_CSS[i % FEST_CSS.length]}">${ic}</span>
+      <span class="lbl">${short}</span>
+    </button>`;
+  }).join('');
+  let me = '';
+  if (coords) { const [x, y] = proj(coords.latitude, coords.longitude); me = `<div class="me" style="left:${x}%;top:${y}%"></div>`; }
+
+  // compact distance/ETA list under the map (also the compass-free fallback)
+  const rows = POIS.map((poi) => ({
+    poi, meta: KIND[poi.kind] || KIND.church,
+    d: coords ? haversine(coords.latitude, coords.longitude, poi.lat, poi.lon) : null,
+  }));
+  if (coords) rows.sort((a, b) => a.d - b.d);
+  const list = rows.map(({ poi, meta, d }) => {
+    let dist = '';
+    if (d != null) {
+      const b = bearing(coords.latitude, coords.longitude, poi.lat, poi.lon);
+      dist = `<div class="dist"><div class="d">${fmtDist(d)}</div><div class="b">~${walkEta(d)} min ${compass16(b)}</div></div>`;
+    }
+    return `<div class="site"><div class="ic">${meta.icon}</div>
+      <div class="main" data-open="${poi.id}"><div class="name">${poi.name}</div><div class="where">${poi.alt}</div></div>
+      ${dist}<button class="row-guide" data-guide="${poi.id}" title="Guide me">\u2794</button></div>`;
+  }).join('');
+
+  openSheet(`<h2>Travel across Divar</h2>
+    <p class="alt">Tap a glowing spot on the map, or a place below, to set your course.</p>
+    <div class="tmap"><div class="grid"></div><div class="sweep"></div>${markers}${me}</div>
+    <div style="margin-top:12px">${list}</div>`);
+  $('sheet-body').querySelectorAll('[data-open]').forEach((el) =>
+    el.addEventListener('click', () => showDetail(POI_BY_ID[el.dataset.open])));
+  $('sheet-body').querySelectorAll('[data-guide]').forEach((el) =>
+    el.addEventListener('click', () => startGuide(POI_BY_ID[el.dataset.guide])));
+}
+
 function renderSites() {
   const rows = markers.length ? markers.slice() : POIS.map((poi) => ({ poi, dist: null }));
   if (coords) {
@@ -556,7 +614,7 @@ function banner(msg) {
 // ---- wire UI ----
 $('btn-start').addEventListener('click', start);
 if ($('start-logo')) $('start-logo').src = logoUrl;
-$('btn-sites').addEventListener('click', renderSites);
+$('btn-sites').addEventListener('click', renderMap);
 $('btn-capture').addEventListener('click', renderCapture);
 $('sheet-close').addEventListener('click', closeSheet);
 $('guide-stop').addEventListener('click', stopGuide);

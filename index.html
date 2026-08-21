@@ -125,6 +125,32 @@
       color: var(--go); font-weight: 800; width: 42px; height: 42px; border-radius: 12px; font-size: 17px; cursor: pointer; }
     .site .row-guide:active { transform: scale(0.94); }
 
+    /* travel map */
+    .tmap { position: relative; width: 100%; height: min(56vh, 430px); margin-top: 8px;
+      border-radius: 16px; overflow: hidden; border: 1px solid var(--stroke);
+      background: radial-gradient(120% 120% at 50% 42%, #14243f 0%, #0a0e18 72%); }
+    .tmap .grid { position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(120,180,255,0.09) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120,180,255,0.09) 1px, transparent 1px);
+      background-size: 30px 30px; }
+    .tmap .sweep { position: absolute; left: 50%; top: 50%; width: 200%; height: 200%;
+      transform: translate(-50%, -50%); pointer-events: none;
+      background: conic-gradient(from 0deg, rgba(47,212,122,0.16), rgba(47,212,122,0) 28%);
+      animation: sweep 6s linear infinite; }
+    @keyframes sweep { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    .mk { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column;
+      align-items: center; gap: 2px; background: none; border: none; cursor: pointer; padding: 0; z-index: 2; }
+    .mk.up { flex-direction: column-reverse; }
+    .mk .dot { width: 24px; height: 24px; border-radius: 50%; background: var(--c);
+      display: flex; align-items: center; justify-content: center; font-size: 13px;
+      box-shadow: 0 0 14px var(--c), inset 0 0 0 2px rgba(255,255,255,0.55); }
+    .mk .lbl { font-size: 10px; font-weight: 700; color: #eef2ff; white-space: nowrap;
+      background: rgba(6,10,20,0.55); padding: 1px 5px; border-radius: 6px; }
+    .me { position: absolute; transform: translate(-50%, -50%); width: 14px; height: 14px; border-radius: 50%;
+      background: #38b6ff; border: 2px solid #fff; z-index: 3;
+      box-shadow: 0 0 0 0 rgba(56,182,255,0.55); animation: mepulse 1.8s ease-out infinite; }
+    @keyframes mepulse { 0% { box-shadow: 0 0 0 0 rgba(56,182,255,0.55); } 100% { box-shadow: 0 0 0 20px rgba(56,182,255,0); } }
+
     /* capture tool */
     .cap-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px;
       border-bottom: 1px solid var(--stroke); font-variant-numeric: tabular-nums; font-size: 13.5px; }
@@ -149,7 +175,7 @@
   </div>
 
   <div id="toolbar">
-    <button class="btn" id="btn-sites">&#9776; Sites</button>
+    <button class="btn" id="btn-sites">&#128506;&#65039; Travel</button>
     <button class="btn" id="btn-capture">&#128205; Capture</button>
   </div>
 
@@ -171,9 +197,7 @@
     <img id="start-logo" alt="Bonderam 2026 &mdash; Divar Island" />
     <div class="kicker">Welcome to Divar</div>
     <h1>The Paradise Island</h1>
-    <p class="sub">Step through and taste the
-      island life &mdash; its churches, ferries, and the <b>Bonderam</b> festival &mdash;
-      floating around you in augmented reality.</p>
+    <p class="sub">Step through and taste the island life. It's churches, ferries, and the <b>Bonderam</b> festival. Floating around you in augmented reality.</p>
     <button class="btn enter" id="btn-start">&#10024; Enter the Paradise Island</button>
     <p class="note">Best outdoors with a clear sky. Allow <b>camera</b>, <b>location</b>
       and <b>motion</b> when asked.</p>
