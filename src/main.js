@@ -4,6 +4,7 @@ import { POIS, FESTIVAL, DEMO_ORIGIN } from './pois.js';
 import { makeLabelSprite, KIND } from './labels.js';
 import { haversine, bearing, compass16, fmtDist } from './geo.js';
 import logoUrl from '../qr/bonderam-logo.webp';
+import { relAngle, cueFor } from './guide-math.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -20,6 +21,8 @@ let arrow = null;
 const chevrons = [];
 let hubProj = null;
 let capSel = null;        // poi id selected in the capture tool
+let voiceOn = true;       // AR voice guidance on/off
+let vCue = '', vAt = 0, vDist = null; // last spoken cue / time / distance
 
 // ---- travel mode + ETA ----
 const SPEED = { walk: 80, drive: 350 };   // metres / minute (~4.8 & ~21 km/h)
@@ -190,6 +193,23 @@ function updateFest() {
     txt += `<br>main event \u00B7 ${fmtDist(d)} \u00B7 ${eta(d)} min ${modeIcon()}`; }
   el.innerHTML = txt;
 }
+// ---- voice guidance (Web Speech) ----
+function speak(text) {
+  if (!voiceOn || !('speechSynthesis' in window)) return;
+  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1; u.lang = 'en-US'; speechSynthesis.speak(u); } catch (e) {}
+}
+const CUE_PHRASE = { straight: 'Straight ahead', right: 'Head right', left: 'Head left', around: 'Turn around' };
+function guideVoice(relAng, dist) {
+  if (DEBUG) window.__voice = { relAng: Math.round(relAng), dist: Math.round(dist), cue: cueFor(relAng, vCue) };
+  if (!voiceOn) return;
+  const now = performance.now();
+  const cue = cueFor(relAng, vCue);
+  const progressed = vDist != null && (vDist - dist) >= 40;   // re-announce every ~40 m closer
+  if ((cue !== vCue || progressed) && now - vAt > 5000) {     // hard 5 s min gap
+    speak(`${CUE_PHRASE[cue]}${dist ? `, ${fmtDist(dist)} to go` : ''}`);
+    vCue = cue; vAt = now; vDist = dist;
+  }
+}
 
 // ================= AR guidance =================
 function chooseDest(poi) {
@@ -209,10 +229,15 @@ function startGuide(poi) {
   ensureArrow(); ensurePath();
   guideId = poi.id;
   updateArBar();
+  vCue = ''; vDist = null; vAt = performance.now();
+  if (coords) { const d = haversine(coords.latitude, coords.longitude, poi.lat, poi.lon);
+    speak(`Guiding you to ${poi.name}, ${fmtDist(d)} away.`); }
+  else speak(`Guiding you to ${poi.name}.`);
   if (!rafId) tickGuide();
 }
 function stopGuide() {
-  guideId = null;
+  guideId = null; vCue = '';
+  if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
   if (arrow) arrow.visible = false;
   for (const c of chevrons) c.visible = false;
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
@@ -296,6 +321,8 @@ function tickGuide() {
   const bob = Math.sin(performance.now() / 300) * 0.08;
   arrow.position.copy(cam.position).addScaledVector(fwd, 6); arrow.position.y = cam.position.y + 0.4 + bob;
   const at = m.sprite.position.clone(); at.y = arrow.position.y; arrow.lookAt(at); arrow.visible = true;
+  const e = new THREE.Euler().setFromQuaternion(cam.quaternion, 'YXZ'); // yaw only, pitch-independent
+  guideVoice(relAngle(e.y, pdir.x, pdir.z), targetDist);
   const flow = (performance.now() / 1000 * PATH_SPEED) % PATH_SPACING;
   const maxD = Math.min(targetDist - 1.5, PATH_START + PATH_N * PATH_SPACING);
   const L = PATH_COLOR_OBJS.length, t = performance.now() / 1000;
@@ -331,6 +358,7 @@ function showDetail(poi) {
 }
 function showArrival(poi) {
   stopGuide(); navigator.vibrate?.([120, 60, 120]);
+  speak(`You have arrived at ${poi.name}.`);
   const meta = KIND[poi.kind] || KIND.church;
   let el = $('arrive');
   if (!el) { el = document.createElement('div'); el.id = 'arrive';
@@ -394,6 +422,12 @@ if ($('start-logo')) $('start-logo').src = logoUrl;
 $('btn-start').addEventListener('click', start);
 $('ar-back').addEventListener('click', showHub);
 $('ar-stop').addEventListener('click', showHub);
+$('ar-voice').addEventListener('click', () => {
+  voiceOn = !voiceOn;
+  $('ar-voice').innerHTML = voiceOn ? '&#128266;' : '&#128263;';
+  if (!voiceOn) { if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} } }
+  else speak('Voice guidance on.');
+});
 $('ar-name').addEventListener('click', () => { if (guideId) showDetail(POI_BY_ID[guideId]); });
 $('sheet-close').addEventListener('click', closeSheet);
 $('hub-explore').addEventListener('click', openExplore);
