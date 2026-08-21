@@ -11,14 +11,14 @@
 
 // ---- Bonderam 2026 (Piedade) -----------------------------------------------
 // Times are IST (+05:30). Flag march / main function 3 PM; float parade 4-6:30.
-// mainEvent is the countdown + navigation anchor (Divar Center / Piedade).
-// APPROX location — verify on-site with the Capture tool.
+// mainEvent is the countdown + navigation anchor (Bonderam festival ground).
+// Location from a user-shared Google Maps pin (\u2248 few m).
 export const FESTIVAL = {
   name: 'Bonderam',
   startsAt: '2026-08-22T15:00:00+05:30',
   floatAt: '2026-08-22T16:00:00+05:30',
   endsAt: '2026-08-22T21:00:00+05:30',
-  mainEvent: { id: 'main-event', lat: 15.5260, lon: 73.9008 }, // APPROX (near church) - keep in sync with POI below; capture on-site
+  mainEvent: { id: 'main-event', lat: 15.5236895, lon: 73.8977822 }, // Google Maps pin - keep in sync with POI below
 };
 
 export const POIS = [
@@ -29,10 +29,10 @@ export const POIS = [
     layer: 'festival',
     kind: 'event',
     year: 'Sat 22 Aug',
-    lat: 15.5260,
-    lon: 73.9008,
+    lat: 15.5236895,
+    lon: 73.8977822,
     elev: 5,
-    verified: false,
+    verified: true,
     blurb:
       'Heart of Bonderam, Divar\u2019s flag festival. Brass bands wake the ' +
       'village at 5 am; the President opens the festival at 3 pm with the ' +
