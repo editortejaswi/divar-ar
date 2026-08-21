@@ -24,6 +24,7 @@ const walkEta = (m) => Math.max(1, Math.round(m / 80));
 let arrow = null;
 let guideId = null;
 let rafId = null;
+const chevrons = [];
 
 // ---- debug diagnostics (?debug=1) ------------------------------------------
 const dbgLog = [];
@@ -237,10 +238,10 @@ function ensureArrow() {
 
   arrow = new THREE.Group();
   const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 1.6), mat);
-  shaft.position.z = 0.7;
+  shaft.position.z = -0.7;
   const head = new THREE.Mesh(new THREE.ConeGeometry(0.92, 1.4, 6), mat);
-  head.rotation.x = -Math.PI / 2;
-  head.position.z = -0.78;
+  head.rotation.x = Math.PI / 2;
+  head.position.z = 0.78;
   arrow.add(shaft, head);
   arrow.scale.setScalar(0.5);
   arrow.renderOrder = 20;
@@ -249,19 +250,48 @@ function ensureArrow() {
   return arrow;
 }
 
+// ---- ground chevron trail (Maps Live-View style path) ----
+const PATH_N = 10, PATH_SPACING = 4, PATH_START = 3, PATH_SPEED = 2.2;
+function chevronGeom() {
+  const g = new THREE.BufferGeometry();
+  // flat triangle in the XZ plane, tip toward +Z (three's lookAt aims +Z at target)
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+    0, 0, 0.75, -0.55, 0, -0.45, 0.55, 0, -0.45,
+  ]), 3));
+  g.computeVertexNormals();
+  return g;
+}
+function ensurePath() {
+  if (chevrons.length) return;
+  const geo = chevronGeom();
+  for (let i = 0; i < PATH_N; i++) {
+    const mat = new THREE.MeshBasicMaterial({
+      color: 0x39e0a0, transparent: true, opacity: 0.9,
+      side: THREE.DoubleSide, depthWrite: false, depthTest: false,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.renderOrder = 15;
+    mesh.visible = false;
+    app.scene.add(mesh);
+    chevrons.push(mesh);
+  }
+}
+
 function startGuide(poi) {
   ensureArrow();
+  ensurePath();
   guideId = poi.id;
   closeSheet();
   $('guide').style.display = 'flex';
   updateGuideBar();
-  banner(`Follow the arrow to ${poi.name}.`);
+  banner(`Follow the glowing path to ${poi.name}.`);
   if (!rafId) tickGuide();
 }
 
 function stopGuide() {
   guideId = null;
   if (arrow) arrow.visible = false;
+  for (const c of chevrons) c.visible = false;
   $('guide').style.display = 'none';
   if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
 }
@@ -270,8 +300,17 @@ function tickGuide() {
   rafId = requestAnimationFrame(tickGuide);
   if (!guideId || !arrow || !app) return;
   const m = markers.find((x) => x.poi.id === guideId);
-  if (!m) { arrow.visible = false; return; }
+  if (!m) { arrow.visible = false; for (const c of chevrons) c.visible = false; return; }
   const cam = app.camera;
+  const groundY = cam.position.y - 1.6;
+
+  // path direction: camera -> destination, horizontal
+  const pdir = new THREE.Vector3().subVectors(m.sprite.position, cam.position);
+  pdir.y = 0;
+  const targetDist = pdir.length();
+  if (targetDist < 1e-3) pdir.set(0, 0, -1); else pdir.normalize();
+
+  // floating arrow ahead in the look direction, aimed at the target
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
   fwd.y = 0;
   if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1);
@@ -279,10 +318,25 @@ function tickGuide() {
   const bob = Math.sin(performance.now() / 300) * 0.08;
   arrow.position.copy(cam.position).addScaledVector(fwd, 5);
   arrow.position.y = cam.position.y - 1.0 + bob;
-  const tgt = m.sprite.position.clone();
-  tgt.y = arrow.position.y;
-  arrow.lookAt(tgt);
+  const at = m.sprite.position.clone(); at.y = arrow.position.y;
+  arrow.lookAt(at);
   arrow.visible = true;
+
+  // ground chevrons flowing toward the destination
+  const flow = (performance.now() / 1000 * PATH_SPEED) % PATH_SPACING;
+  const maxD = Math.min(targetDist - 1.5, PATH_START + PATH_N * PATH_SPACING);
+  for (let i = 0; i < chevrons.length; i++) {
+    const c = chevrons[i];
+    const d = PATH_START + flow + i * PATH_SPACING;
+    if (d > maxD) { c.visible = false; continue; }
+    c.position.copy(cam.position).addScaledVector(pdir, d);
+    c.position.y = groundY;
+    c.lookAt(c.position.x + pdir.x, groundY, c.position.z + pdir.z);
+    const fadeIn = Math.min(1, (d - PATH_START) / 3);
+    const fadeOut = Math.min(1, (maxD - d) / 4);
+    c.material.opacity = 0.9 * Math.max(0, Math.min(fadeIn, fadeOut));
+    c.visible = c.material.opacity > 0.02;
+  }
 }
 
 function updateGuideBar() {
