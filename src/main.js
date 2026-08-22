@@ -448,18 +448,25 @@ function celebrateArrival(poi) {
   $('cb-info').onclick = () => { stopCelebration(); showHub(); showDetail(poi); };
   $('cb-map').onclick = () => { stopCelebration(); showHub(); };
 }
-function makeArrivedSprite() {
+function makeArrivedPlaque() {
+  const grp = new THREE.Group();
+  const W = 2.4, H = 0.92, D = 0.16;
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, H + 0.14, D * 0.62),
+    new THREE.MeshStandardMaterial({ color: 0xffd23f, metalness: 0.9, roughness: 0.22, emissive: 0x3a2a00, emissiveIntensity: 0.25 }));
+  frame.position.z = -0.03;
+  const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D),
+    new THREE.MeshStandardMaterial({ color: 0x121826, metalness: 0.4, roughness: 0.35, emissive: 0x0a1024, emissiveIntensity: 0.35 }));
   const c = document.createElement('canvas'); c.width = 1024; c.height = 384; const g = c.getContext('2d');
-  g.fillStyle = 'rgba(10,14,20,0.82)';
-  if (g.roundRect) { g.beginPath(); g.roundRect(18, 18, 988, 300, 42); } else { g.beginPath(); g.rect(18, 18, 988, 300); }
-  g.fill(); g.lineWidth = 8; g.strokeStyle = '#ffd23f'; g.stroke();
   g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = '120px serif'; g.fillText('\u{1F389}', 130, 150); g.fillText('\u{1F388}', 894, 150);
-  g.fillStyle = '#ffffff'; g.font = 'bold 96px system-ui, sans-serif'; g.fillText('You\u2019ve arrived!', 512, 132);
-  g.fillStyle = '#ffd23f'; g.font = 'bold 62px system-ui, sans-serif'; g.fillText('Bonderam 2026', 512, 238);
-  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
-  spr.scale.set(2.4, 0.9, 1); return spr;
+  g.font = '120px serif'; g.fillText('\u{1F389}', 126, 150); g.fillText('\u{1F388}', 898, 150);
+  g.fillStyle = '#ffffff'; g.font = 'bold 96px system-ui, sans-serif'; g.fillText('You\u2019ve arrived!', 512, 142);
+  g.fillStyle = '#ffd23f'; g.font = 'bold 64px system-ui, sans-serif'; g.fillText('Bonderam 2026', 512, 250);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(W * 0.92, H * 0.86),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  face.position.z = D / 2 + 0.003;
+  grp.add(frame, body, face);
+  return grp;
 }
 function startCelebration() {
   if (!app) return;
@@ -470,9 +477,11 @@ function startCelebration() {
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion); fwd.y = 0;
   if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
   celebAnchor = cam.position.clone(); const ay = celebAnchor.y;
-  celebText = makeArrivedSprite();
+  celebText = makeArrivedPlaque();
   celebText.position.set(celebAnchor.x + fwd.x * 4.5, ay + 0.55, celebAnchor.z + fwd.z * 4.5);
-  celebText.renderOrder = 30; app.scene.add(celebText);
+  celebText.userData.baseYaw = Math.atan2(-fwd.x, -fwd.z);   // front (+Z) faces the user
+  celebText.rotation.y = celebText.userData.baseYaw;
+  app.scene.add(celebText);
   for (let i = 0; i < 16; i++) {
     const col = CELEB_PAL[i % CELEB_PAL.length], grp = new THREE.Group();
     const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 20, 16),
@@ -521,7 +530,11 @@ function celebrateTick() {
     }
     celebConfetti.geometry.attributes.position.needsUpdate = true;
   }
-  if (celebText) celebText.position.y = celebAnchor.y + 0.7 + Math.sin(t * 1.5) * 0.08;
+  if (celebText) {
+    celebText.position.y = celebAnchor.y + 0.55 + Math.sin(t * 1.4) * 0.07;
+    celebText.rotation.y = celebText.userData.baseYaw + Math.sin(t * 0.6) * 0.28;   // turn to show its 3D depth
+    celebText.rotation.x = Math.sin(t * 0.9) * 0.05;
+  }
 }
 function stopCelebration() {
   if (celebRaf) { cancelAnimationFrame(celebRaf); celebRaf = null; }
