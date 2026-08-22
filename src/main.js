@@ -468,6 +468,17 @@ function makeArrivedPlaque() {
   grp.add(frame, body, face);
   return grp;
 }
+function makeBalloonTex(hex) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256; const g = c.getContext('2d');
+  g.fillStyle = '#' + hex.toString(16).padStart(6, '0'); g.fillRect(0, 0, 512, 256);
+  const grd = g.createLinearGradient(0, 0, 0, 256);
+  grd.addColorStop(0, 'rgba(255,255,255,0.28)'); grd.addColorStop(0.5, 'rgba(255,255,255,0)'); grd.addColorStop(1, 'rgba(0,0,0,0.18)');
+  g.fillStyle = grd; g.fillRect(0, 0, 512, 256);
+  g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = 'bold 48px system-ui, sans-serif';
+  for (const x of [128, 384]) { g.fillText('Viva', x, 98); g.fillText('Bonderam', x, 156); }   // twice around so it reads from either side
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+}
 function startCelebration() {
   if (!app) return;
   ensureArrow();                 // guarantees scene lights + environment for glossy balloons
@@ -484,8 +495,8 @@ function startCelebration() {
   app.scene.add(celebText);
   for (let i = 0; i < 16; i++) {
     const col = CELEB_PAL[i % CELEB_PAL.length], grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 20, 16),
-      new THREE.MeshStandardMaterial({ color: col, roughness: 0.16, metalness: 0, emissive: col, emissiveIntensity: 0.06 }));
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 28, 20),
+      new THREE.MeshStandardMaterial({ map: makeBalloonTex(col), roughness: 0.18, metalness: 0, emissive: col, emissiveIntensity: 0.03 }));
     body.scale.set(1, 1.18, 1);
     const str = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.9, 6),
       new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.45 }));
