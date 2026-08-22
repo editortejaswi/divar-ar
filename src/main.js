@@ -110,7 +110,7 @@ function refresh() {
     m.dist = d;
     const h = Math.min(Math.max(d * 0.1, 5), 120);
     m.sprite.scale.set(h * (m.sprite.aspect || 2), h, 1);
-    m.sprite.visible = d < 4000;
+    m.sprite.visible = !celebrating && d < 4000;
   }
   if (guideId) {
     updateArBar();
@@ -432,7 +432,7 @@ function showArrival(poi) {
 }
 
 // ================= 3D festive arrival (balloons + confetti + hovering banner) =================
-let celebRaf = null, celebText = null, celebConfetti = null, celebAnchor = null, celebLast = 0;
+let celebRaf = null, celebText = null, celebConfetti = null, celebAnchor = null, celebLast = 0, celebrating = false;
 const celebBalloons = [];
 const CELEB_PAL = [0xffd23f, 0x2fd47a, 0xff2fd0, 0x9a7bff, 0xff77c2, 0x38b6ff, 0xff8a3d, 0xff5a5a];
 function celebrateArrival(poi) {
@@ -465,6 +465,7 @@ function startCelebration() {
   if (!app) return;
   ensureArrow();                 // guarantees scene lights + environment for glossy balloons
   stopCelebration();             // guard re-entry (no double batch)
+  celebrating = true; for (const m of markers) m.sprite.visible = false;   // hide POI labels during the celebration
   const cam = app.camera;
   const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion); fwd.y = 0;
   if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
@@ -529,6 +530,7 @@ function stopCelebration() {
   rm(celebConfetti); celebConfetti = null;
   rm(celebText); celebText = null;
   const el = $('celeb-ctl'); if (el) el.style.display = 'none';
+  celebrating = false; for (const m of markers) if (m.dist != null) m.sprite.visible = m.dist < 4000;   // restore POI labels
 }
 
 function renderCapture() {
