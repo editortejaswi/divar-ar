@@ -90,6 +90,7 @@ async function start() {
   setInterval(updateFest, 1000);
   showHub();
   if (DEMO) locar.fakeGps(DEMO_ORIGIN.lon, DEMO_ORIGIN.lat); else locar.startGps();
+  if (params.get('arrive')) setTimeout(() => showArrival(POI_BY_ID[params.get('arrive')] || POI_BY_ID[ROUTE_DEST]), 1500); // preview: ?arrive=main-event
 }
 
 function addPois() {
@@ -241,6 +242,7 @@ function startGuide(poi) {
 }
 function stopGuide() {
   guideId = null; vCue = ''; sCam = null;
+  stopCelebration();
   if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
   if (arrow) arrow.visible = false;
   for (const c of chevrons) c.visible = false;
@@ -412,6 +414,7 @@ function showDetail(poi) {
 function showArrival(poi) {
   stopGuide(); navigator.vibrate?.([120, 60, 120]);
   speak(`You have arrived at ${poi.name}.`);
+  if (poi.id === ROUTE_DEST) return celebrateArrival(poi);   // festive 3D AR celebration at the venue
   const meta = KIND[poi.kind] || KIND.church;
   let el = $('arrive');
   if (!el) { el = document.createElement('div'); el.id = 'arrive';
@@ -425,6 +428,106 @@ function showArrival(poi) {
   el.style.display = 'flex';
   $('a-info').onclick = () => { el.style.display = 'none'; showDetail(poi); };
   $('a-map').onclick = () => { el.style.display = 'none'; showHub(); };
+}
+
+// ================= 3D festive arrival (balloons + confetti + hovering banner) =================
+let celebRaf = null, celebText = null, celebConfetti = null, celebAnchor = null, celebLast = 0;
+const celebBalloons = [];
+const CELEB_PAL = [0xffd23f, 0x2fd47a, 0xff2fd0, 0x9a7bff, 0xff77c2, 0x38b6ff, 0xff8a3d, 0xff5a5a];
+function celebrateArrival(poi) {
+  $('arbar').style.display = 'none'; $('hub').style.display = 'none';
+  startCelebration();
+  let el = $('celeb-ctl');
+  if (!el) { el = document.createElement('div'); el.id = 'celeb-ctl';
+    el.style.cssText = 'position:fixed;left:14px;right:14px;bottom:calc(var(--safe-b) + 18px);z-index:55;display:flex;gap:10px;justify-content:center';
+    document.body.appendChild(el); }
+  el.innerHTML = `<button class="btn go" id="cb-info" style="flex:1;max-width:210px">${(KIND[poi.kind] || KIND.church).icon} View details</button>`
+    + `<button class="btn" id="cb-map" style="flex:1;max-width:210px">\u2039 Back to map</button>`;
+  el.style.display = 'flex';
+  $('cb-info').onclick = () => { stopCelebration(); showHub(); showDetail(poi); };
+  $('cb-map').onclick = () => { stopCelebration(); showHub(); };
+}
+function makeArrivedSprite() {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 384; const g = c.getContext('2d');
+  g.fillStyle = 'rgba(10,14,20,0.82)';
+  if (g.roundRect) { g.beginPath(); g.roundRect(18, 18, 988, 300, 42); } else { g.beginPath(); g.rect(18, 18, 988, 300); }
+  g.fill(); g.lineWidth = 8; g.strokeStyle = '#ffd23f'; g.stroke();
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '120px serif'; g.fillText('\u{1F389}', 130, 150); g.fillText('\u{1F388}', 894, 150);
+  g.fillStyle = '#ffffff'; g.font = 'bold 96px system-ui, sans-serif'; g.fillText('You\u2019ve arrived!', 512, 132);
+  g.fillStyle = '#ffd23f'; g.font = 'bold 62px system-ui, sans-serif'; g.fillText('Bonderam 2026', 512, 238);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
+  spr.scale.set(4.2, 1.58, 1); return spr;
+}
+function startCelebration() {
+  if (!app) return;
+  ensureArrow();                 // guarantees scene lights + environment for glossy balloons
+  stopCelebration();             // guard re-entry (no double batch)
+  const cam = app.camera;
+  const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion); fwd.y = 0;
+  if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
+  celebAnchor = cam.position.clone(); const ay = celebAnchor.y;
+  celebText = makeArrivedSprite();
+  celebText.position.set(celebAnchor.x + fwd.x * 4.0, ay + 0.8, celebAnchor.z + fwd.z * 4.0);
+  celebText.renderOrder = 30; app.scene.add(celebText);
+  for (let i = 0; i < 16; i++) {
+    const col = CELEB_PAL[i % CELEB_PAL.length], grp = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 16),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.16, metalness: 0, emissive: col, emissiveIntensity: 0.06 }));
+    body.scale.set(1, 1.18, 1);
+    const str = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.9, 6),
+      new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.45 }));
+    str.position.y = -0.72; grp.add(body, str);
+    const a = Math.random() * 6.28, rad = 2.2 + Math.random() * 4.2;
+    grp.position.set(celebAnchor.x + Math.cos(a) * rad, ay - 1.6 + Math.random() * 2.4, celebAnchor.z + Math.sin(a) * rad);
+    grp.userData = { vy: 0.5 + Math.random() * 0.7, sw: 0.3 + Math.random() * 0.4, ph: Math.random() * 6.28, bx: grp.position.x, bz: grp.position.z };
+    app.scene.add(grp); celebBalloons.push(grp);
+  }
+  const N = 300, pos = new Float32Array(N * 3), col = new Float32Array(N * 3), vel = new Float32Array(N), phase = new Float32Array(N), c3 = new THREE.Color();
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = celebAnchor.x + (Math.random() - 0.5) * 22;
+    pos[i * 3 + 1] = ay + 3 + Math.random() * 10;
+    pos[i * 3 + 2] = celebAnchor.z + (Math.random() - 0.5) * 22;
+    c3.set(CELEB_PAL[Math.floor(Math.random() * CELEB_PAL.length)]); col[i * 3] = c3.r; col[i * 3 + 1] = c3.g; col[i * 3 + 2] = c3.b;
+    vel[i] = 0.8 + Math.random() * 1.5; phase[i] = Math.random() * 6.28;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  celebConfetti = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.055, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }));
+  celebConfetti.userData = { vel, phase, N, ay }; celebConfetti.renderOrder = 28; app.scene.add(celebConfetti);
+  celebLast = performance.now(); celebrateTick();
+}
+function celebrateTick() {
+  celebRaf = requestAnimationFrame(celebrateTick);
+  const now = performance.now(), dt = Math.min(0.05, (now - celebLast) / 1000), t = now / 1000; celebLast = now;
+  for (const grp of celebBalloons) {
+    const u = grp.userData; grp.position.y += u.vy * dt;
+    grp.position.x = u.bx + Math.sin(t * u.sw + u.ph) * 0.35;
+    grp.position.z = u.bz + Math.cos(t * u.sw * 0.8 + u.ph) * 0.35;
+    grp.rotation.z = Math.sin(t * u.sw + u.ph) * 0.12;
+    if (grp.position.y > celebAnchor.y + 16) grp.position.y = celebAnchor.y - 2;
+  }
+  if (celebConfetti) {
+    const p = celebConfetti.geometry.attributes.position.array, u = celebConfetti.userData;
+    for (let i = 0; i < u.N; i++) {
+      p[i * 3 + 1] -= u.vel[i] * dt;
+      p[i * 3] += Math.sin(t * 2 + u.phase[i]) * 0.012;
+      p[i * 3 + 2] += Math.cos(t * 1.7 + u.phase[i]) * 0.012;
+      if (p[i * 3 + 1] < u.ay - 2) p[i * 3 + 1] = u.ay + 9 + Math.random() * 2;
+    }
+    celebConfetti.geometry.attributes.position.needsUpdate = true;
+  }
+  if (celebText) celebText.position.y = celebAnchor.y + 0.7 + Math.sin(t * 1.5) * 0.08;
+}
+function stopCelebration() {
+  if (celebRaf) { cancelAnimationFrame(celebRaf); celebRaf = null; }
+  const rm = (o) => { if (!o || !app) return; app.scene.remove(o); o.traverse((n) => { if (n.geometry) n.geometry.dispose(); if (n.material) { (Array.isArray(n.material) ? n.material : [n.material]).forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); }); } }); };
+  celebBalloons.forEach(rm); celebBalloons.length = 0;
+  rm(celebConfetti); celebConfetti = null;
+  rm(celebText); celebText = null;
+  const el = $('celeb-ctl'); if (el) el.style.display = 'none';
 }
 
 function renderCapture() {
