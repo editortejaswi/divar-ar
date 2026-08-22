@@ -91,6 +91,7 @@ async function start() {
   showHub();
   if (DEMO) locar.fakeGps(DEMO_ORIGIN.lon, DEMO_ORIGIN.lat); else locar.startGps();
   if (params.get('arrive')) setTimeout(() => showArrival(POI_BY_ID[params.get('arrive')] || POI_BY_ID[ROUTE_DEST]), 1500); // preview: ?arrive=main-event
+  if (params.has('fov')) { app.camera.fov = +params.get('fov') || 65; app.camera.updateProjectionMatrix(); } // preview real-phone FOV headlessly
 }
 
 function addPois() {
@@ -458,7 +459,7 @@ function makeArrivedSprite() {
   g.fillStyle = '#ffd23f'; g.font = 'bold 62px system-ui, sans-serif'; g.fillText('Bonderam 2026', 512, 238);
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }));
-  spr.scale.set(4.2, 1.58, 1); return spr;
+  spr.scale.set(2.4, 0.9, 1); return spr;
 }
 function startCelebration() {
   if (!app) return;
@@ -469,18 +470,18 @@ function startCelebration() {
   if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1); fwd.normalize();
   celebAnchor = cam.position.clone(); const ay = celebAnchor.y;
   celebText = makeArrivedSprite();
-  celebText.position.set(celebAnchor.x + fwd.x * 4.0, ay + 0.8, celebAnchor.z + fwd.z * 4.0);
+  celebText.position.set(celebAnchor.x + fwd.x * 4.5, ay + 0.55, celebAnchor.z + fwd.z * 4.5);
   celebText.renderOrder = 30; app.scene.add(celebText);
   for (let i = 0; i < 16; i++) {
     const col = CELEB_PAL[i % CELEB_PAL.length], grp = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 16),
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 20, 16),
       new THREE.MeshStandardMaterial({ color: col, roughness: 0.16, metalness: 0, emissive: col, emissiveIntensity: 0.06 }));
     body.scale.set(1, 1.18, 1);
     const str = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.9, 6),
       new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.45 }));
     str.position.y = -0.72; grp.add(body, str);
-    const a = Math.random() * 6.28, rad = 2.2 + Math.random() * 4.2;
-    grp.position.set(celebAnchor.x + Math.cos(a) * rad, ay - 1.6 + Math.random() * 2.4, celebAnchor.z + Math.sin(a) * rad);
+    const fa = Math.atan2(fwd.z, fwd.x), a = fa + (Math.random() - 0.5) * 3.0, rad = 3 + Math.random() * 6;
+    grp.position.set(celebAnchor.x + Math.cos(a) * rad, ay - 1.5 + Math.random() * 3.2, celebAnchor.z + Math.sin(a) * rad);
     grp.userData = { vy: 0.5 + Math.random() * 0.7, sw: 0.3 + Math.random() * 0.4, ph: Math.random() * 6.28, bx: grp.position.x, bz: grp.position.z };
     app.scene.add(grp); celebBalloons.push(grp);
   }
@@ -495,7 +496,7 @@ function startCelebration() {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  celebConfetti = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.055, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }));
+  celebConfetti = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.06, sizeAttenuation: true, vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false }));
   celebConfetti.userData = { vel, phase, N, ay }; celebConfetti.renderOrder = 28; app.scene.add(celebConfetti);
   celebLast = performance.now(); celebrateTick();
 }
