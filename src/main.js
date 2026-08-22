@@ -474,9 +474,13 @@ function makeBalloonTex(hex) {
   const grd = g.createLinearGradient(0, 0, 0, 256);
   grd.addColorStop(0, 'rgba(255,255,255,0.28)'); grd.addColorStop(0.5, 'rgba(255,255,255,0)'); grd.addColorStop(1, 'rgba(0,0,0,0.18)');
   g.fillStyle = grd; g.fillRect(0, 0, 512, 256);
-  g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = 'bold 48px system-ui, sans-serif';
-  for (const x of [128, 384]) { g.fillText('Viva', x, 98); g.fillText('Bonderam', x, 156); }   // twice around so it reads from either side
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 48px system-ui, sans-serif';
+  const gold = (y) => { const gg = g.createLinearGradient(0, y - 26, 0, y + 26); gg.addColorStop(0, '#fff6c2'); gg.addColorStop(0.45, '#ffd23f'); gg.addColorStop(0.55, '#f4b400'); gg.addColorStop(1, '#9c6b08'); return gg; };
+  g.lineWidth = 3; g.strokeStyle = 'rgba(70,48,0,0.55)';   // dark-gold outline for legibility on any balloon
+  for (const x of [128, 384]) {
+    g.fillStyle = gold(98); g.strokeText('Viva', x, 98); g.fillText('Viva', x, 98);
+    g.fillStyle = gold(156); g.strokeText('Bonderam', x, 156); g.fillText('Bonderam', x, 156);
+  }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
 }
 function startCelebration() {
