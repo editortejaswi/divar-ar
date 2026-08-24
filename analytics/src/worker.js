@@ -40,7 +40,7 @@ export default {
     // ---- stats API (key-gated) ----
     if (url.pathname === '/api/stats') {
       if ((url.searchParams.get('key') || '') !== env.DASH_KEY) return json({ error: 'unauthorized' }, 401);
-      const now = Date.now(), dayAgo = now - 86400000, live = now - 90000;
+      const now = Date.now(), dayAgo = now - 86400000, live = now - 150000; // 150s window > 120s beat interval
       const sod = (() => { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return d.getTime(); })();
       const first = (sql, ...a) => env.DB.prepare(sql).bind(...a).first();
       const all = (sql, ...a) => env.DB.prepare(sql).bind(...a).all();

@@ -689,6 +689,6 @@ $('mode').querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('cli
 
 if (DEMO) start();
 
-// ---- analytics: count this visit, and beat presence every 60s while visible ----
+// ---- analytics: count this visit, and beat presence every 120s while visible (D1 free-tier friendly) ----
 analyticsVisit();
-setInterval(() => analyticsBeat(coords && coords.latitude, coords && coords.longitude, guideId), 60000);
+setInterval(() => analyticsBeat(coords && coords.latitude, coords && coords.longitude, guideId), 120000);
