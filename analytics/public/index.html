@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="no-referrer" />   <!-- don't leak ?key= to OSM tile servers -->
+  <title>Divar AR — Live Analytics</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root { --bg:#0b0e14; --panel:#141a26; --stroke:#243044; --text:#eaf1ff; --muted:#8b97a8; --go:#2fd47a; --gold:#ffd23f; --pink:#ff77c2; --blue:#38b6ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif; }
+    header { display:flex; align-items:center; gap:12px; padding:16px 20px; border-bottom:1px solid var(--stroke); position:sticky; top:0; background:var(--bg); z-index:5; }
+    header h1 { font-size:18px; margin:0; font-weight:800; }
+    header .live { display:flex; align-items:center; gap:6px; color:var(--go); font-weight:700; font-size:13px; }
+    header .dot { width:9px; height:9px; border-radius:50%; background:var(--go); box-shadow:0 0 0 0 rgba(47,212,122,.6); animation:pulse 1.8s infinite; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(47,212,122,.6)} 100%{box-shadow:0 0 0 10px rgba(47,212,122,0)} }
+    header .upd { margin-left:auto; color:var(--muted); font-size:12px; }
+    .wrap { padding:18px 20px; max-width:1100px; margin:0 auto; }
+    .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+    .card { background:var(--panel); border:1px solid var(--stroke); border-radius:16px; padding:16px; }
+    .card .k { color:var(--muted); font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
+    .card .v { font-size:34px; font-weight:800; margin-top:6px; font-variant-numeric:tabular-nums; }
+    .card.big .v { color:var(--go); }
+    .card .sub { color:var(--muted); font-size:12px; margin-top:4px; }
+    .row { display:grid; grid-template-columns:1.4fr 1fr; gap:12px; margin-top:12px; }
+    @media (max-width:760px){ .row{ grid-template-columns:1fr; } }
+    .box { background:var(--panel); border:1px solid var(--stroke); border-radius:16px; padding:14px; }
+    .box h2 { font-size:13px; margin:0 0 10px; color:var(--muted); text-transform:uppercase; letter-spacing:.6px; }
+    #map { height:340px; border-radius:12px; overflow:hidden; }
+    .leaflet-container { background:#0a0e18; }
+    .bars { display:flex; align-items:flex-end; gap:3px; height:150px; }
+    .bars .bar { flex:1; background:linear-gradient(var(--blue),var(--pink)); border-radius:3px 3px 0 0; min-height:2px; position:relative; }
+    .bars .bar span { position:absolute; bottom:-18px; left:0; right:0; text-align:center; font-size:9px; color:var(--muted); }
+    .list div { display:flex; justify-content:space-between; padding:7px 2px; border-bottom:1px solid var(--stroke); font-size:14px; }
+    .list div b { font-variant-numeric:tabular-nums; }
+    .split { display:flex; gap:0; height:14px; border-radius:7px; overflow:hidden; margin-top:8px; }
+    .split .qr { background:var(--gold); } .split .dir { background:var(--blue); }
+    #gate { position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; flex-direction:column; gap:12px; z-index:20; padding:24px; text-align:center; }
+    #gate input { padding:12px; border-radius:10px; border:1px solid var(--stroke); background:var(--panel); color:var(--text); font-size:16px; width:min(320px,90vw); }
+    #gate button { padding:12px 20px; border-radius:10px; border:none; background:var(--go); color:#062; font-weight:800; font-size:15px; cursor:pointer; }
+    .err { color:#ff8a8a; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎪 Divar AR</h1>
+    <span class="live"><span class="dot"></span>LIVE</span>
+    <span class="upd" id="upd">connecting…</span>
+  </header>
+  <div class="wrap">
+    <div class="cards">
+      <div class="card big"><div class="k">Active now</div><div class="v" id="c-active">–</div><div class="sub">last 90s</div></div>
+      <div class="card"><div class="k">Today · visitors</div><div class="v" id="c-tvis">–</div><div class="sub" id="c-tvisits"></div></div>
+      <div class="card"><div class="k">Today · QR scans</div><div class="v" id="c-tscans">–</div><div class="sub">vs direct</div></div>
+      <div class="card"><div class="k">Total visitors</div><div class="v" id="c-total">–</div><div class="sub" id="c-uniq"></div></div>
+      <div class="card"><div class="k">Scans vs direct</div><div class="v" id="c-ratio" style="font-size:20px">–</div>
+        <div class="split"><div class="qr" id="s-qr"></div><div class="dir" id="s-dir"></div></div></div>
+    </div>
+    <div class="row">
+      <div class="box"><h2>Live locations on Divar</h2><div id="map"></div></div>
+      <div class="box"><h2>Visitors per hour (24h)</h2><div class="bars" id="bars"></div></div>
+    </div>
+    <div class="row">
+      <div class="box"><h2>Most-guided places</h2><div class="list" id="pois"></div></div>
+      <div class="box"><h2>Countries</h2><div class="list" id="countries"></div></div>
+    </div>
+  </div>
+
+  <div id="gate">
+    <div style="font-size:40px">🔐</div>
+    <div>Enter dashboard key</div>
+    <input id="gate-key" type="password" placeholder="dashboard key" />
+    <button onclick="saveKey()">Open dashboard</button>
+    <div class="err" id="gate-err"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ---- key handling: pull from ?key=, stash in localStorage, strip from URL ----
+    const u = new URL(location.href);
+    if (u.searchParams.get('key')) { localStorage.setItem('divar_dash_key', u.searchParams.get('key')); history.replaceState(null, '', u.pathname); }
+    let KEY = localStorage.getItem('divar_dash_key') || '';
+    function saveKey(){ KEY = document.getElementById('gate-key').value.trim(); localStorage.setItem('divar_dash_key', KEY); document.getElementById('gate').style.display='none'; tick(); }
+    function gate(msg){ document.getElementById('gate').style.display='flex'; if(msg) document.getElementById('gate-err').textContent=msg; }
+
+    // ---- map ----
+    let map, layer;
+    function initMap(){
+      map = L.map('map', { attributionControl:false, zoomControl:true }).setView([15.5277,73.905], 13);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(map);
+      layer = L.layerGroup().addTo(map);
+    }
+    const fmt = n => (n==null?'0':Number(n).toLocaleString());
+    let lastData = 0;
+    async function tick(){
+      if(!KEY){ gate(); return; }
+      try {
+        const r = await fetch('/api/stats?key=' + encodeURIComponent(KEY), { cache:'no-store' });
+        if (r.status === 401) { gate('Wrong key.'); return; }
+        const d = await r.json();
+        render(d); lastData = Date.now();
+      } catch(e){ document.getElementById('upd').textContent = 'offline — retrying'; }
+    }
+    function render(d){
+      const t=d.totals||{}, td=d.today||{};
+      document.getElementById('c-active').textContent = fmt(d.active);
+      document.getElementById('c-tvis').textContent = fmt(td.visitors);
+      document.getElementById('c-tvisits').textContent = fmt(td.visits)+' views today';
+      document.getElementById('c-tscans').textContent = fmt(td.scans);
+      document.getElementById('c-total').textContent = fmt(t.visitors);
+      document.getElementById('c-uniq').textContent = fmt(t.uniq)+' unique devices';
+      const scans=+t.scans||0, direct=+t.direct||0, tot=scans+direct||1;
+      document.getElementById('c-ratio').textContent = Math.round(scans/tot*100)+'% QR · '+Math.round(direct/tot*100)+'% direct';
+      document.getElementById('s-qr').style.width = (scans/tot*100)+'%';
+      document.getElementById('s-dir').style.width = (direct/tot*100)+'%';
+      // map
+      if(map){ layer.clearLayers(); const pts=[];
+        (d.live||[]).forEach(p=>{ if(p.lat==null)return; const m=L.circleMarker([p.lat,p.lon],{radius:7,color:'#062',weight:2,fillColor:'#2fd47a',fillOpacity:.9}); m.addTo(layer); pts.push([p.lat,p.lon]); });
+        if(pts.length) map.fitBounds(pts,{maxZoom:15,padding:[30,30]});
+      }
+      // hourly bars
+      const bars=document.getElementById('bars'); bars.innerHTML='';
+      const hrs=d.hourly||[]; const now=Math.floor(d.now/3600000); const map24={}; hrs.forEach(h=>map24[h.hr]=h.n);
+      const vals=[]; for(let i=23;i>=0;i--){ vals.push({hr:now-i, n:map24[now-i]||0}); }
+      const max=Math.max(1,...vals.map(v=>v.n));
+      vals.forEach((v,i)=>{ const b=document.createElement('div'); b.className='bar'; b.style.height=(v.n/max*100)+'%'; b.title=v.n+' visitors'; if(i%6===0){ const s=document.createElement('span'); s.textContent=new Date(v.hr*3600000).getHours()+'h'; b.appendChild(s);} bars.appendChild(b); });
+      // lists
+      const poisEl=document.getElementById('pois'); poisEl.innerHTML = (d.pois||[]).length? d.pois.map(p=>`<div><span>${esc(p.poi)}</span><b>${fmt(p.n)}</b></div>`).join('') : '<div><span style="color:var(--muted)">no guidance yet</span></div>';
+      const cEl=document.getElementById('countries'); cEl.innerHTML = (d.countries||[]).length? d.countries.map(c=>`<div><span>${esc(c.country)}</span><b>${fmt(c.n)}</b></div>`).join('') : '<div><span style="color:var(--muted)">—</span></div>';
+    }
+    function esc(s){ return String(s==null?'':s).replace(/[<>&]/g,x=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[x])); }
+    setInterval(()=>{ const a=Math.round((Date.now()-lastData)/1000); document.getElementById('upd').textContent = lastData? ('updated '+a+'s ago') : 'connecting…'; }, 1000);
+    initMap(); tick(); setInterval(tick, 8000);
+  </script>
+</body>
+</html>

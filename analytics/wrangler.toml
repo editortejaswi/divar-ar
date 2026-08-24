@@ -1,0 +1,21 @@
+name = "divar-analytics"
+main = "src/worker.js"
+compatibility_date = "2024-11-01"
+
+# Dashboard (public/index.html) served at /; Worker handles /e and /api/stats.
+[assets]
+directory = "./public"
+
+# DASH_KEY is the private dashboard access key. It is a SECRET — set it with:
+#   npx wrangler secret put DASH_KEY
+# NEVER put the real key in this file: this repo is PUBLIC. For local dev only,
+# put  DASH_KEY=something  in .dev.vars (gitignored). With no key set, the API stays locked.
+
+[[d1_databases]]
+binding = "DB"
+database_name = "divar_analytics"
+database_id = "REPLACE_WITH_YOUR_D1_ID"   # from: npx wrangler d1 create divar_analytics
+
+# nightly prune so storage/reads stay tiny (and free)
+[triggers]
+crons = ["7 3 * * *"]

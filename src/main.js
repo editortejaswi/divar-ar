@@ -7,6 +7,7 @@ import logoUrl from '../qr/bonderam-logo.webp';
 import { relAngle, cueFor, nearestOnPoly, alongPoly } from './guide-math.js';
 import mapUrl from './divar-map.webp';
 import { ROUTES, ROUTE_DEST } from './routes.js';
+import { analyticsVisit, analyticsBeat } from './analytics.js';
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -234,6 +235,7 @@ function openExplore() {
 function startGuide(poi) {
   ensureArrow(); ensurePath();
   guideId = poi.id;
+  analyticsBeat(coords && coords.latitude, coords && coords.longitude, poi.id);
   updateArBar();
   vCue = ''; vDist = null; vAt = performance.now();
   if (coords) { const d = haversine(coords.latitude, coords.longitude, poi.lat, poi.lon);
@@ -686,3 +688,7 @@ $('mode').querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('cli
 }));
 
 if (DEMO) start();
+
+// ---- analytics: count this visit, and beat presence every 60s while visible ----
+analyticsVisit();
+setInterval(() => analyticsBeat(coords && coords.latitude, coords && coords.longitude, guideId), 60000);
