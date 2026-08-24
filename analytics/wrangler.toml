@@ -14,7 +14,7 @@ directory = "./public"
 [[d1_databases]]
 binding = "DB"
 database_name = "divar_analytics"
-database_id = "REPLACE_WITH_YOUR_D1_ID"   # from: npx wrangler d1 create divar_analytics
+database_id = "c3be1649-5a1f-42b3-82af-49e5eb167ae2"   # from: npx wrangler d1 create divar_analytics
 
 # nightly prune so storage/reads stay tiny (and free)
 [triggers]

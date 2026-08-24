@@ -1,6 +1,6 @@
 // First-party analytics beacon -> our Cloudflare Worker (divar-analytics).
 // Anonymous, device-local session id. No-op until ENDPOINT is set (post-deploy).
-const ENDPOINT = '';   // set to https://divar-analytics.<subdomain>.workers.dev after deploy (no-op until then)
+const ENDPOINT = 'https://divar-analytics.tejas-divar.workers.dev';   // our Cloudflare Worker
 
 const params = new URLSearchParams(location.search);
 let sid = localStorage.getItem('divar_sid');
