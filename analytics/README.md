@@ -43,7 +43,6 @@ to help run the festival.
   - Dashboard: open `.../?key=YOUR_KEY` (the key is stripped from the URL after load).
   - Stats API: `GET .../api/stats?key=YOUR_KEY` -> 200; without/ wrong key -> 401.
   - Beacon ingest: `POST .../e` (used by the app).
-- Cloudflare account: `tejas4friends@gmail.com` (account id `6c9fad38cecb0082f5ef533e2d86483a`).
 - D1 database: `divar_analytics` (id in `wrangler.toml`).
 - The app (`src/analytics.js`) points `ENDPOINT` at this Worker.
 
