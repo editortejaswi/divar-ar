@@ -1,0 +1,40 @@
+name: Deploy analytics dashboard
+
+# Redeploys the Cloudflare Worker + dashboard whenever analytics/ changes on main.
+# Stays green (deploy step skipped) until you add the token, then auto-deploys.
+#
+# One-time setup: add a repo secret CLOUDFLARE_API_TOKEN
+#   Cloudflare dashboard -> My Profile -> API Tokens -> Create Token
+#   -> "Edit Cloudflare Workers" template (add D1:Edit) -> copy the token
+#   GitHub: repo -> Settings -> Secrets and variables -> Actions -> New secret
+#   Name: CLOUDFLARE_API_TOKEN   Value: <the token>
+# The DASH_KEY secret + D1 database already live on Cloudflare and persist across deploys.
+
+on:
+  push:
+    branches: [main]
+    paths: ['analytics/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HAS_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - if: env.HAS_TOKEN == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - if: env.HAS_TOKEN == 'true'
+        run: npm i
+        working-directory: analytics
+      - if: env.HAS_TOKEN == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 6c9fad38cecb0082f5ef533e2d86483a
+          workingDirectory: analytics
+      - if: env.HAS_TOKEN != 'true'
+        run: echo "CLOUDFLARE_API_TOKEN not set — skipping deploy (see workflow header for setup)."

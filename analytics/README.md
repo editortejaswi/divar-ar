@@ -37,3 +37,19 @@ sessions would approach the daily request cap — then the $5/mo Workers Paid pl
 Anonymous device-local session id; no accounts, no PII. Location is sent only while the app
 is open and is shown to you as aggregate live pins. The app tells users their location is shared
 to help run the festival.
+
+## Live deployment (as shipped)
+- Dashboard + API: `https://divar-analytics.tejas-divar.workers.dev`
+  - Dashboard: open `.../?key=YOUR_KEY` (the key is stripped from the URL after load).
+  - Stats API: `GET .../api/stats?key=YOUR_KEY` -> 200; without/ wrong key -> 401.
+  - Beacon ingest: `POST .../e` (used by the app).
+- Cloudflare account: `tejas4friends@gmail.com` (account id `6c9fad38cecb0082f5ef533e2d86483a`).
+- D1 database: `divar_analytics` (id in `wrangler.toml`).
+- The app (`src/analytics.js`) points `ENDPOINT` at this Worker.
+
+### Manage it
+- Rotate the dashboard key:  `cd analytics && npx wrangler secret put DASH_KEY`  (type a new value)
+- Watch live logs / debug dropped beacons:  `cd analytics && npx wrangler tail`
+- Redeploy by hand:  `cd analytics && npx wrangler deploy`
+- Redeploy from GitHub: push to `analytics/**` (needs the `CLOUDFLARE_API_TOKEN` repo secret — see `.github/workflows/deploy-analytics.yml`).
+- Wipe all analytics data:  `cd analytics && npx wrangler d1 execute DB --remote --command "DELETE FROM events"`
