@@ -33,7 +33,7 @@ export default {
             (req.cf && req.cf.country) || null
           ).run();
         }
-      } catch (e) { /* never fail a beacon */ }
+      } catch (e) { console.error('beacon insert failed', e && e.message); /* never fail a beacon */ }
       return new Response(null, { status: 204, headers: CORS });
     }
 
